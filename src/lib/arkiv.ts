@@ -500,7 +500,7 @@ export async function createMemoryNode(input: CreateMemoryInput) {
       payload,
       attributes: memoryNodeAttributes(payload),
       txHash: result.txHash,
-    } satisfies Partial<ArkivEntityRecord<MemoryNodePayload>>,
+    } satisfies ArkivEntityRecord<MemoryNodePayload>,
   };
 }
 
@@ -523,7 +523,7 @@ export async function createModifierStack(input: CreateModifierStackInput) {
       payload,
       attributes: modifierStackAttributes(payload),
       txHash: result.txHash,
-    } satisfies Partial<ArkivEntityRecord<ModifierStackPayload>>,
+    } satisfies ArkivEntityRecord<ModifierStackPayload>,
   };
 }
 
@@ -546,7 +546,7 @@ export async function createAgentReflection(input: CreateAgentReflectionInput) {
       payload,
       attributes: agentReflectionAttributes(payload),
       txHash: result.txHash,
-    } satisfies Partial<ArkivEntityRecord<AgentReflectionPayload>>,
+    } satisfies ArkivEntityRecord<AgentReflectionPayload>,
   };
 }
 

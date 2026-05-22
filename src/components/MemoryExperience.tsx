@@ -4,7 +4,6 @@ import {
   Loader2, 
   RefreshCw, 
   Sparkles, 
-  Terminal, 
   Send, 
   CheckCircle2, 
   AlertCircle,
@@ -16,6 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { 
   readMemoryGraph, 
   createAgentReflection, 
+  createModifierStack,
   arkivExplorerEntityUrl,
   getConnectedWallet,
   watchWalletConnection,
@@ -25,6 +25,7 @@ import {
   type WalletConnection,
   type DiscoveredProvider
 } from "@/lib/arkiv";
+import { DEMO_MODIFIERS } from "@/lib/constants";
 import { truncateMiddle } from "@/lib/format";
 import type {
   AgentReflectionPayload,
@@ -79,7 +80,9 @@ export function MemoryExperience() {
   const [selectedPersona, setSelectedPersona] = useState("custom");
   const [selectedStackKey, setSelectedStackKey] = useState("");
   const [isSubmittingReflection, setIsSubmittingReflection] = useState(false);
+  const [isCreatingStack, setIsCreatingStack] = useState(false);
   const [reflectionError, setReflectionError] = useState<string | null>(null);
+  const [stackError, setStackError] = useState<string | null>(null);
   const [reflectionSuccess, setReflectionSuccess] = useState(false);
   const [wallet, setWallet] = useState<WalletConnection | null>(null);
   const [providers, setProviders] = useState<DiscoveredProvider[]>([]);
@@ -131,9 +134,11 @@ export function MemoryExperience() {
     try {
       const nextGraph = await readMemoryGraph(memoryKey);
       setGraph(nextGraph);
+      return nextGraph;
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not read memory graph.");
       setGraph(null);
+      return null;
     } finally {
       setIsLoading(false);
     }
@@ -178,6 +183,76 @@ export function MemoryExperience() {
       setReflectionText(persona.text);
     } else if (personaId === "custom") {
       setReflectionText("");
+    }
+  };
+
+  const availableProviders = () => {
+    const legacy = getLegacyProvider();
+    const allProviders = [...providers];
+    if (legacy && !providers.some((p) => p.rdns === legacy.rdns || p.name === legacy.name)) {
+      allProviders.push(legacy);
+    }
+    return allProviders;
+  };
+
+  const handleConnectProvider = async (providerUuid: string) => {
+    setReflectionError(null);
+    setStackError(null);
+
+    try {
+      await connectWallet(providerUuid);
+    } catch (err) {
+      setReflectionError(err instanceof Error ? err.message : "Connection failed");
+      setStackError(err instanceof Error ? err.message : "Connection failed");
+    }
+  };
+
+  const handleCreateDefaultStack = async () => {
+    if (!graph) return;
+
+    setIsCreatingStack(true);
+    setStackError(null);
+    setReflectionSuccess(false);
+
+    try {
+      const result = await createModifierStack({
+        memoryKey,
+        modifiers: DEMO_MODIFIERS,
+        interpreter: "agent-reflection-layer:v1",
+        context: "Interpretation layer for user-owned agent reflections",
+        authority: "wallet-owner",
+      });
+
+      setSelectedStackKey(result.entityKey);
+      const createdStack = result.record;
+      setGraph((current) => {
+        if (!current || current.stacks.some((stack) => stack.key === createdStack.key)) {
+          return current;
+        }
+
+        return {
+          ...current,
+          stacks: [createdStack, ...current.stacks],
+        };
+      });
+
+      const refreshedGraph = await loadGraph();
+      if (!refreshedGraph?.stacks.some((stack) => stack.key === createdStack.key)) {
+        setGraph((current) => {
+          if (!current || current.stacks.some((stack) => stack.key === createdStack.key)) {
+            return current;
+          }
+
+          return {
+            ...current,
+            stacks: [createdStack, ...current.stacks],
+          };
+        });
+      }
+    } catch (err) {
+      setStackError(err instanceof Error ? err.message : "Could not create a modifier stack.");
+    } finally {
+      setIsCreatingStack(false);
     }
   };
 
@@ -267,18 +342,68 @@ export function MemoryExperience() {
               </article>
 
               {/* Agent Reflection Sandbox Panel */}
-              <article className="rounded-xl border border-indigo-200 bg-[#fbfbfe] p-5 shadow-sm">
-                <div className="flex items-center gap-2 border-b border-indigo-100 pb-3 mb-4">
-                  <Terminal className="h-5 w-5 text-indigo-600 animate-pulse" />
-                  <h2 className="text-xl font-black text-indigo-950">Agent Reflection Sandbox</h2>
+              <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
+                  <Sparkles className="h-5 w-5 text-[#4361ee]" aria-hidden />
+                  <h2 className="text-xl font-black text-slate-950">Agent reflections</h2>
                 </div>
 
                 {graph.stacks.length === 0 ? (
-                  <div className="flex items-start gap-3 rounded-lg border border-[#ffd166] bg-[#fffdf0] p-4 text-sm text-[#8a6d00]">
-                    <AlertCircle className="h-5 w-5 shrink-0 text-[#f5a623]" />
-                    <div>
-                      <p className="font-bold">ModifierStack required</p>
-                      <p className="text-xs text-slate-500 mt-1">To submit an Agent Reflection, this memory node must have at least one associated ModifierStack.</p>
+                  <div className="rounded-lg border border-dashed border-slate-300 bg-[#f8fbff] p-5">
+                    <div className="mb-3 grid h-10 w-10 place-items-center rounded-lg bg-white text-[#4361ee] ring-1 ring-slate-200">
+                      <Sparkles className="h-5 w-5" aria-hidden />
+                    </div>
+                    <div className="grid gap-4">
+                      <p className="font-black text-slate-950">This memory is waiting for an interpretation layer.</p>
+                      <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">
+                        Create a linked modifier stack, then write the first agent reflection against it.
+                      </p>
+                      {stackError ? (
+                        <div className="rounded-lg border border-[#ff6b6b] bg-[#fff0f0] p-3 text-sm font-semibold text-[#9d0208]">
+                          {stackError}
+                        </div>
+                      ) : null}
+                      {wallet ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleCreateDefaultStack()}
+                          disabled={isCreatingStack}
+                          className="inline-flex h-11 w-fit items-center justify-center gap-2 rounded-lg bg-slate-950 px-5 text-sm font-black text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {isCreatingStack ? (
+                            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                          ) : (
+                            <Sparkles className="h-4 w-4" aria-hidden />
+                          )}
+                          {isCreatingStack ? "Creating modifier stack" : "Create interpretation layer"}
+                        </button>
+                      ) : (
+                        <div className="grid gap-3">
+                          <p className="text-sm font-semibold text-slate-600">
+                            Connect a wallet to add the modifier stack for this memory.
+                          </p>
+                          {availableProviders().length === 0 ? (
+                            <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-600">
+                              No browser wallet detected.
+                            </div>
+                          ) : (
+                            <div className="flex flex-wrap gap-2">
+                              {availableProviders().map((prov) => (
+                                <button
+                                  key={prov.uuid}
+                                  type="button"
+                                  onClick={() => void handleConnectProvider(prov.uuid)}
+                                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={prov.icon} alt="" className="h-4 w-4 rounded object-contain" />
+                                  <span>Connect {prov.name}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -384,13 +509,9 @@ export function MemoryExperience() {
                           </div>
                         </div>
                         {(() => {
-                          const legacy = getLegacyProvider();
-                          const allProviders = [...providers];
-                          if (legacy && !providers.some((p) => p.rdns === legacy.rdns || p.name === legacy.name)) {
-                            allProviders.push(legacy);
-                          }
+                          const providersForReflection = availableProviders();
 
-                          if (allProviders.length === 0) {
+                          if (providersForReflection.length === 0) {
                             return (
                               <div className="flex gap-2 rounded border border-[#ff6b6b] bg-[#fff0f0] p-2.5 text-xs font-semibold text-[#9d0208]">
                                 <AlertCircle className="h-4 w-4 shrink-0 text-[#ff6b6b]" />
@@ -401,18 +522,11 @@ export function MemoryExperience() {
 
                           return (
                             <div className="flex flex-wrap gap-2 mt-1">
-                              {allProviders.map((prov) => (
+                              {providersForReflection.map((prov) => (
                                 <button
                                   key={prov.uuid}
                                   type="button"
-                                  onClick={async () => {
-                                    setReflectionError(null);
-                                    try {
-                                      await connectWallet(prov.uuid);
-                                    } catch (err) {
-                                      setReflectionError(err instanceof Error ? err.message : "Connection failed");
-                                    }
-                                  }}
+                                  onClick={() => void handleConnectProvider(prov.uuid)}
                                   className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700 shadow-sm transition"
                                 >
                                   {/* eslint-disable-next-line @next/next/no-img-element */}

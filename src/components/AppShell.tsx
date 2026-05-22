@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { APP_NAME, PROJECT_ATTRIBUTE } from "@/lib/constants";
+import { APP_NAME } from "@/lib/constants";
 
 import { WalletButton } from "./WalletButton";
 
@@ -30,9 +30,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </span>
             <span className="min-w-0">
               <span className="block text-base font-black tracking-tight">{APP_NAME}</span>
-              <span className="block truncate font-mono text-[10px] uppercase tracking-[0.16em] text-slate-500">
-                {PROJECT_ATTRIBUTE}
-              </span>
+              <span className="block text-xs font-semibold text-slate-500">User-owned AI memory</span>
             </span>
           </Link>
 
