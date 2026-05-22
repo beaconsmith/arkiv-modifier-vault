@@ -31,9 +31,9 @@ export function MemoryGraph({
   return (
     <section className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(255,107,107,0.16),transparent_28%),radial-gradient(circle_at_85%_28%,rgba(6,214,160,0.18),transparent_24%),radial-gradient(circle_at_55%_78%,rgba(67,97,238,0.13),transparent_30%)]" />
-      <div className="relative grid gap-4 2xl:grid-cols-[minmax(0,1fr)_minmax(280px,360px)]">
-        <div className="min-h-[360px] rounded-lg border border-slate-200 bg-[#f8fbff]/86 p-4">
-          <div className="grid min-h-[320px] gap-3 sm:grid-cols-[1fr_80px_1fr] sm:items-center">
+      <div className="relative grid gap-4">
+        <div className="min-h-[360px] min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-[#f8fbff]/86 p-4">
+          <div className="grid min-h-[320px] min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_64px_minmax(0,1fr)] md:items-center">
             <GraphNode
               tone="coral"
               icon={<Brain className="h-5 w-5" aria-hidden />}
@@ -41,7 +41,7 @@ export function MemoryGraph({
               subtitle={payload?.content ?? "Read or create a memory to reveal its payload."}
             />
             
-            <div className="relative h-full min-h-[100px] sm:min-h-0">
+            <div className="relative h-full min-h-[100px] min-w-0 md:min-h-0">
               <svg
                 className="absolute inset-0 h-full w-full"
                 preserveAspectRatio="none"
@@ -100,7 +100,7 @@ export function MemoryGraph({
               </div>
             </div>
 
-            <div className="grid gap-3">
+            <div className="grid min-w-0 gap-3">
               {activeStacks.length ? (
                 activeStacks.slice(0, 3).map((stack, index) => (
                   <GraphNode
@@ -139,8 +139,8 @@ export function MemoryGraph({
           ) : null}
         </div>
 
-        <aside className="grid content-start gap-4">
-          <div className="rounded-lg border border-slate-200 bg-[#fbffef] p-4">
+        <aside className="grid content-start gap-4 md:grid-cols-2">
+          <div className="min-w-0 rounded-lg border border-slate-200 bg-[#fbffef] p-4">
             <div className="mb-3 flex items-center gap-2 text-sm font-black uppercase tracking-[0.14em] text-slate-500">
               <KeyRound className="h-4 w-4 text-[#8ac926]" aria-hidden />
               Arkiv proof
@@ -148,7 +148,7 @@ export function MemoryGraph({
             <EntityMeta record={memory} />
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <div className="min-w-0 rounded-lg border border-slate-200 bg-white p-4">
             <h3 className="text-sm font-black uppercase tracking-[0.14em] text-slate-500">
               Active modifiers
             </h3>
@@ -193,10 +193,10 @@ function GraphNode({
   };
 
   return (
-    <div className={`rounded-xl border p-4 shadow-sm backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:shadow-md ${tones[tone]}`}>
+    <div className={`min-w-0 overflow-hidden rounded-xl border p-4 shadow-sm backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:shadow-md ${tones[tone]}`}>
       <div className={`mb-3 grid h-10 w-10 place-items-center rounded-lg ${iconTones[tone]}`}>{icon}</div>
-      <h3 className="break-words text-base font-black tracking-tight">{title}</h3>
-      <p className="mt-2 overflow-hidden text-sm leading-6 opacity-80 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:4]">
+      <h3 className="break-words text-base font-black tracking-tight [overflow-wrap:anywhere]">{title}</h3>
+      <p className="mt-2 overflow-hidden break-words text-sm leading-6 opacity-80 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:4] [overflow-wrap:anywhere]">
         {subtitle}
       </p>
     </div>
