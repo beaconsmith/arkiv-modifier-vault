@@ -26,8 +26,8 @@ https://modifiervault.vercel.app
 Latest inspected production deployment:
 
 ```txt
-dpl_3UtNVT1KiTytFtvetMxXYyPGhKYg
-https://modifiervault-18yvz7avn-beaconsmiths-projects.vercel.app
+dpl_GzW9PvHKcoCvFxFtZLcxpCFN9rtr
+https://modifiervault-iqk176n3k-beaconsmiths-projects.vercel.app
 status: READY
 ```
 
