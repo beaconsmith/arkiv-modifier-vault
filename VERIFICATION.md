@@ -12,6 +12,7 @@ Result:
 
 - `npm run lint` passed.
 - `npm run build` passed.
+- `npm audit --audit-level=moderate` found 0 vulnerabilities.
 - Next.js generated `/`, `/atlas`, `/create`, `/query`, and `/memory/[key]`.
 
 ## Vercel
