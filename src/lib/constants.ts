@@ -1,7 +1,8 @@
 export const PROJECT_ATTRIBUTE = "modifiervault_beaconsmith_ethns_2026";
+export const SCHEMA_VERSION = "2";
 
 export const APP_NAME = "ModifierVault";
-export const APP_TAGLINE = "Own your AI agent's memory, not just the chat.";
+export const APP_TAGLINE = "Own the way your AI remembers.";
 
 export const ARKIV_BRAGA_CHAIN_ID = 60138453102;
 export const ARKIV_BRAGA_RPC_URL =
@@ -23,11 +24,18 @@ export const ARKIV_GAS_FEE_MULTIPLIER =
   BigInt(process.env.NEXT_PUBLIC_ARKIV_GAS_FEE_MULTIPLIER ?? "3");
 
 export const DEMO_MEMORY_CONTENT =
-  "Optimized codon bias scales expression rates in mRNA design maps.";
+  "When I solve hard problems, I map contradictions first, then let a pattern emerge before choosing a direction.";
 
 export const DEMO_MODIFIERS = [
-  "scale",
-  "route:codon-optimization",
-  "transform:expression",
+  "expand:contradictions",
+  "route:private-reasoning",
+  "transform:pattern-map",
   "remember",
 ];
+
+export const DEMO_MEMORY_TITLE = "Private Thinking Pattern";
+export const DEMO_MEMORY_DOMAIN = "personal-cognition";
+export const DEMO_INTERPRETER = "cognition-atlas:v2";
+export const DEMO_CONTEXT =
+  "Private reasoning pattern for future agents that need to understand how this user reaches decisions.";
+export const DEMO_AUTHORITY = "wallet-owner";

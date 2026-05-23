@@ -12,7 +12,14 @@ import {
 } from "@/lib/arkiv";
 import { PROJECT_ATTRIBUTE } from "@/lib/constants";
 import { formatDate, truncateMiddle } from "@/lib/format";
-import type { ArkivEntityRecord, MemoryNodePayload, ModifierStackPayload } from "@/lib/schema";
+import {
+  getMemoryDisplayContent,
+  type ArkivEntityRecord,
+  type ContentMode,
+  type MemoryNodePayload,
+  type ModifierStackPayload,
+  type Visibility,
+} from "@/lib/schema";
 
 import { EntityMeta } from "./EntityMeta";
 import { ModifierToken } from "./ModifierToken";
@@ -20,6 +27,12 @@ import { ModifierToken } from "./ModifierToken";
 export function QueryExperience() {
   const [memoryKey, setMemoryKey] = useState("");
   const [modifier, setModifier] = useState("");
+  const [domain, setDomain] = useState("");
+  const [interpreter, setInterpreter] = useState("");
+  const [contentMode, setContentMode] = useState<ContentMode | "">("");
+  const [visibility, setVisibility] = useState<Visibility | "">("");
+  const [owner, setOwner] = useState("");
+  const [creator, setCreator] = useState("");
   const [memories, setMemories] = useState<ArkivEntityRecord<MemoryNodePayload>[]>([]);
   const [stacks, setStacks] = useState<ArkivEntityRecord<ModifierStackPayload>[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -32,11 +45,15 @@ export function QueryExperience() {
     try {
       const trimmedMemoryKey = memoryKey.trim();
       const trimmedModifier = modifier.trim();
+      const trimmedDomain = domain.trim();
+      const trimmedInterpreter = interpreter.trim();
+      const trimmedOwner = owner.trim();
+      const trimmedCreator = creator.trim();
 
       if (trimmedMemoryKey) {
         const [memory, linkedStacks] = await Promise.all([
           readMemoryNode(trimmedMemoryKey),
-          queryModifierStacks({ memoryKey: trimmedMemoryKey }),
+          queryModifierStacks({ memoryKey: trimmedMemoryKey, includeLegacy: true }),
         ]);
         setMemories([memory]);
         setStacks(linkedStacks);
@@ -44,15 +61,33 @@ export function QueryExperience() {
       }
 
       if (trimmedModifier) {
-        const result = await queryMemoryNodesByModifier(trimmedModifier);
-        setMemories(result.memories);
+        const result = await queryMemoryNodesByModifier(trimmedModifier, 25, {
+          interpreter: trimmedInterpreter || undefined,
+        });
+        const filteredMemories = result.memories.filter((memory) => {
+          return (
+            (!trimmedDomain || memory.payload.domain === trimmedDomain) &&
+            (!contentMode || (memory.payload.contentMode ?? "plaintext") === contentMode) &&
+            (!visibility || memory.payload.visibility === visibility)
+          );
+        });
+        setMemories(filteredMemories);
         setStacks(result.stacks);
         return;
       }
 
-      const projectMemories = await queryMemoryNodes();
+      const projectMemories = await queryMemoryNodes({
+        domain: trimmedDomain || undefined,
+        contentMode: contentMode || undefined,
+        visibility: visibility || undefined,
+        owner: trimmedOwner || undefined,
+        creator: trimmedCreator || undefined,
+      });
+      const linkedStacks = trimmedInterpreter
+        ? await queryModifierStacks({ interpreter: trimmedInterpreter })
+        : [];
       setMemories(projectMemories);
-      setStacks([]);
+      setStacks(linkedStacks);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Arkiv query failed.");
       setMemories([]);
@@ -60,7 +95,7 @@ export function QueryExperience() {
     } finally {
       setIsLoading(false);
     }
-  }, [memoryKey, modifier]);
+  }, [contentMode, creator, domain, interpreter, memoryKey, modifier, owner, visibility]);
 
   useEffect(() => {
     let isActive = true;
@@ -70,7 +105,7 @@ export function QueryExperience() {
       setError(null);
 
       try {
-        const projectMemories = await queryMemoryNodes();
+          const projectMemories = await queryMemoryNodes();
 
         if (isActive) {
           setMemories(projectMemories);
@@ -98,10 +133,10 @@ export function QueryExperience() {
       <section className="grid gap-5 lg:grid-cols-[minmax(0,0.8fr)_minmax(360px,0.5fr)]">
         <div>
           <h1 className="text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
-            Query owned memory by project, key, or modifier.
+            Search your AI memory graph
           </h1>
           <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-600">
-            All searches include the required Arkiv project attribute:{" "}
+            Find stored memories and modifier configurations on the Arkiv ledger. All queries are restricted to the project namespace:{" "}
             <code className="rounded-md bg-white px-2 py-1 font-mono text-sm text-slate-950 ring-1 ring-slate-200">
               {PROJECT_ATTRIBUTE}
             </code>
@@ -116,24 +151,94 @@ export function QueryExperience() {
           }}
           className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-[0_20px_50px_rgba(15,23,42,0.08)]"
         >
-          <label className="grid gap-2 text-sm font-bold text-slate-700">
-            Memory key
-            <input
-              value={memoryKey}
-              onChange={(event) => setMemoryKey(event.target.value)}
-              placeholder="0x..."
-              className="input font-mono text-sm"
-            />
-          </label>
-          <label className="grid gap-2 text-sm font-bold text-slate-700">
-            Modifier
-            <input
-              value={modifier}
-              onChange={(event) => setModifier(event.target.value)}
-              placeholder="route:biology"
-              className="input font-mono text-sm"
-            />
-          </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+              <span>Memory Key <span className="text-xs font-normal text-slate-400">(exact blockchain key)</span></span>
+              <input
+                value={memoryKey}
+                onChange={(event) => setMemoryKey(event.target.value)}
+                placeholder="0x..."
+                className="input font-mono text-sm"
+              />
+            </label>
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+              <span>Modifier <span className="text-xs font-normal text-slate-400">(e.g. route:email)</span></span>
+              <input
+                value={modifier}
+                onChange={(event) => setModifier(event.target.value)}
+                placeholder="route:private-reasoning"
+                className="input font-mono text-sm"
+              />
+            </label>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+              <span>Category / Domain</span>
+              <input
+                value={domain}
+                onChange={(event) => setDomain(event.target.value)}
+                placeholder="personal-cognition"
+                className="input font-mono text-sm"
+              />
+            </label>
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+              <span>Interpreter <span className="text-xs font-normal text-slate-400">(execution schema)</span></span>
+              <input
+                value={interpreter}
+                onChange={(event) => setInterpreter(event.target.value)}
+                placeholder="cognition-atlas:v2"
+                className="input font-mono text-sm"
+              />
+            </label>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+              <span>Storage Mode</span>
+              <select
+                value={contentMode}
+                onChange={(event) => setContentMode(event.target.value as ContentMode | "")}
+                className="input"
+              >
+                <option value="">any</option>
+                <option value="plaintext">plaintext (public)</option>
+                <option value="metadata-only">metadata-only (private content)</option>
+                <option value="encrypted">encrypted (passphrase required)</option>
+              </select>
+            </label>
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+              <span>Visibility</span>
+              <select
+                value={visibility}
+                onChange={(event) => setVisibility(event.target.value as Visibility | "")}
+                className="input"
+              >
+                <option value="">any</option>
+                <option value="private">private</option>
+                <option value="shared">shared</option>
+                <option value="public">public</option>
+              </select>
+            </label>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+              <span>Owner Wallet</span>
+              <input
+                value={owner}
+                onChange={(event) => setOwner(event.target.value)}
+                placeholder="0x..."
+                className="input font-mono text-sm"
+              />
+            </label>
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
+              <span>Creator Wallet</span>
+              <input
+                value={creator}
+                onChange={(event) => setCreator(event.target.value)}
+                placeholder="0x..."
+                className="input font-mono text-sm"
+              />
+            </label>
+          </div>
           <button
             type="submit"
             disabled={isLoading}
@@ -144,7 +249,7 @@ export function QueryExperience() {
             ) : (
               <Search className="h-4 w-4" aria-hidden />
             )}
-            Query Arkiv
+            Search Arkiv Ledger
           </button>
         </form>
       </section>
@@ -180,10 +285,11 @@ export function QueryExperience() {
                   >
                     {memory.payload.title}
                   </Link>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">{memory.payload.content}</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">{getMemoryDisplayContent(memory.payload)}</p>
                   <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
                     <span>{memory.payload.domain}</span>
                     <span>{memory.payload.visibility}</span>
+                    <span>{memory.payload.contentMode ?? "plaintext"}</span>
                     <span>{formatDate(memory.payload.createdAt)}</span>
                   </div>
                 </div>

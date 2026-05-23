@@ -1,13 +1,15 @@
 import { Brain, GitBranch, KeyRound, Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { DEMO_MODIFIERS } from "@/lib/constants";
+import { getMemoryDisplayContent, getReflectionDisplayText } from "@/lib/schema";
 import type {
   AgentReflectionPayload,
   ArkivEntityRecord,
   MemoryNodePayload,
   ModifierStackPayload,
 } from "@/lib/schema";
-import { truncateMiddle } from "@/lib/format";
+
 
 import { EntityMeta } from "./EntityMeta";
 import { ModifierToken } from "./ModifierToken";
@@ -36,13 +38,13 @@ export function MemoryGraph({
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(255,107,107,0.16),transparent_28%),radial-gradient(circle_at_85%_28%,rgba(6,214,160,0.18),transparent_24%),radial-gradient(circle_at_55%_78%,rgba(67,97,238,0.13),transparent_30%)]" />
       <div className="relative grid gap-4">
         <div className="min-h-[360px] min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-[#f8fbff]/86 p-4">
-          <div className="grid min-h-[320px] min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_64px_minmax(0,1fr)] md:items-center">
+          <div className="grid min-h-[320px] min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_64px_minmax(0,1fr)_64px_minmax(0,1fr)] md:items-center">
             <GraphNode
               testId="memory-graph-node-memory"
               tone="coral"
               icon={<Brain className="h-5 w-5" aria-hidden />}
               title={payload?.title ?? "MemoryNode"}
-              subtitle={payload?.content ?? "Read or create a memory to reveal its payload."}
+              subtitle={payload ? getMemoryDisplayContent(payload as MemoryNodePayload) : "Read or create a memory to reveal its payload."}
             />
             
             <div className="relative h-full min-h-[100px] min-w-0 md:min-h-0">
@@ -87,7 +89,7 @@ export function MemoryGraph({
                   </>
                 ) : (
                   activeStacks.slice(0, 3).map((_, idx) => {
-                    const yPositions = [20, 50, 80];
+                    const yPositions = activeStacks.length === 1 ? [50] : activeStacks.length === 2 ? [35, 65] : [20, 50, 80];
                     const yTarget = yPositions[idx] ?? 50;
                     const pathData = `M 0 50 C 35 50, 65 ${yTarget}, 100 ${yTarget}`;
                     return (
@@ -99,7 +101,7 @@ export function MemoryGraph({
                   })
                 )}
               </svg>
-              <div className="absolute left-1/2 top-1/2 grid h-10 w-10 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-md z-10 hover:scale-110 transition duration-300">
+              <div className="absolute left-1/2 top-1/2 grid h-8 w-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-md z-10 hover:scale-110 transition duration-300">
                 <GitBranch className="h-4 w-4" aria-hidden />
               </div>
             </div>
@@ -126,23 +128,68 @@ export function MemoryGraph({
                 />
               )}
             </div>
-          </div>
-          {reflections.length ? (
-            <div className="mt-4 rounded-lg border border-[#c7d2fe] bg-gradient-to-r from-indigo-50/80 to-blue-50/80 p-3 text-sm text-slate-700 shadow-inner backdrop-blur-sm">
-              <div className="mb-1 flex items-center gap-2 font-black text-indigo-950">
-                <Sparkles className="h-4 w-4 text-[#4361ee] animate-pulse" aria-hidden />
-                Agent Reflection
-              </div>
-              <p className="italic text-slate-700">
-                &ldquo;{reflections[0]?.payload?.reflection}&rdquo;
-              </p>
-              <div className="mt-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-indigo-500">
-                <span>Model: {reflections[0]?.payload?.model}</span>
-                <span>•</span>
-                <span>Keys: {truncateMiddle(reflections[0]?.key, 8, 6)}</span>
+
+            <div className="relative h-full min-h-[100px] min-w-0 md:min-h-0">
+              <svg
+                className="absolute inset-0 h-full w-full"
+                preserveAspectRatio="none"
+                viewBox="0 0 100 100"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                {reflections.length === 0 ? (
+                  <>
+                    <path d="M 0 50 C 30 50, 70 50, 100 50" className="glow-line opacity-40" />
+                    <path d="M 0 50 C 30 50, 70 50, 100 50" className="pulse-line" />
+                  </>
+                ) : (
+                  Array.from({ length: Math.max(activeStacks.length, 1) }).map((_, sIdx) => {
+                    const sYPositions = activeStacks.length === 1 ? [50] : activeStacks.length === 2 ? [35, 65] : [20, 50, 80];
+                    const sY = sYPositions[sIdx] ?? 50;
+
+                    return Array.from({ length: Math.min(reflections.length, 3) }).map((_, rIdx) => {
+                      const rYPositions = Math.min(reflections.length, 3) === 1 ? [50] : Math.min(reflections.length, 3) === 2 ? [35, 65] : [20, 50, 80];
+                      const rY = rYPositions[rIdx] ?? 50;
+                      const pathData = `M 0 ${sY} C 35 ${sY}, 65 ${rY}, 100 ${rY}`;
+
+                      return (
+                        <g key={`${sIdx}-${rIdx}`}>
+                          <path d={pathData} className="glow-line opacity-40" />
+                          <path d={pathData} className="pulse-line" />
+                        </g>
+                      );
+                    });
+                  })
+                )}
+              </svg>
+              <div className="absolute left-1/2 top-1/2 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-indigo-200 bg-indigo-50 text-[10px] font-black text-indigo-600 shadow-md z-10 hover:scale-110 transition duration-300">
+                {reflections.length}
               </div>
             </div>
-          ) : null}
+
+            <div className="grid min-w-0 gap-3">
+              {reflections.length ? (
+                reflections.slice(0, 3).map((reflection, index) => (
+                  <GraphNode
+                    key={reflection.key ?? index}
+                    testId={`memory-graph-node-reflection-${index}`}
+                    tone="indigo"
+                    icon={<Sparkles className="h-5 w-5" aria-hidden />}
+                    title={`Interpretation ${index + 1}`}
+                    subtitle={reflection.payload ? getReflectionDisplayText(reflection.payload as AgentReflectionPayload) : ""}
+                  />
+                ))
+              ) : (
+                <GraphNode
+                  testId="memory-graph-node-reflection-empty"
+                  tone="indigo"
+                  icon={<Sparkles className="h-5 w-5" aria-hidden />}
+                  title="Interpretation"
+                  subtitle="Save interpretations to execute modifiers."
+                />
+              )}
+            </div>
+          </div>
         </div>
 
         <aside className="grid content-start gap-4 md:grid-cols-2">
@@ -165,12 +212,7 @@ export function MemoryGraph({
               Active modifiers
             </h3>
             <div className="mt-3 flex flex-wrap gap-2">
-              {(activeStacks[0]?.payload?.modifiers ?? [
-                "expand",
-                "route:biology",
-                "transform:design",
-                "remember",
-              ]).map((modifier, index) => (
+              {(activeStacks[0]?.payload?.modifiers ?? DEMO_MODIFIERS).map((modifier, index) => (
                 <ModifierToken key={modifier} modifier={modifier} index={index} />
               ))}
             </div>

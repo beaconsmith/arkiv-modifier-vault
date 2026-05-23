@@ -16,8 +16,18 @@ import {
   type WalletConnection,
   type DiscoveredProvider,
 } from "@/lib/arkiv";
-import { DEMO_MEMORY_CONTENT, DEMO_MODIFIERS, PROJECT_ATTRIBUTE } from "@/lib/constants";
-import { parseModifierInput, type Visibility } from "@/lib/schema";
+import {
+  DEMO_AUTHORITY,
+  DEMO_CONTEXT,
+  DEMO_INTERPRETER,
+  DEMO_MEMORY_CONTENT,
+  DEMO_MEMORY_DOMAIN,
+  DEMO_MEMORY_TITLE,
+  DEMO_MODIFIERS,
+  PROJECT_ATTRIBUTE,
+} from "@/lib/constants";
+import { encryptString } from "@/lib/crypto";
+import { parseModifierInput, type ContentMode, type Visibility } from "@/lib/schema";
 import { truncateMiddle } from "@/lib/format";
 
 import { EntityMeta } from "./EntityMeta";
@@ -34,14 +44,16 @@ type CreateResult = {
 };
 
 export function CreateExperience() {
-  const [title, setTitle] = useState("Codon Optimization Modifier Cache");
+  const [title, setTitle] = useState(DEMO_MEMORY_TITLE);
   const [content, setContent] = useState(DEMO_MEMORY_CONTENT);
-  const [domain, setDomain] = useState("biology/codon-design");
-  const [visibility, setVisibility] = useState<Visibility>("public");
+  const [domain, setDomain] = useState(DEMO_MEMORY_DOMAIN);
+  const [visibility, setVisibility] = useState<Visibility>("private");
+  const [contentMode, setContentMode] = useState<ContentMode>("encrypted");
+  const [passphrase, setPassphrase] = useState("");
   const [modifiers, setModifiers] = useState(DEMO_MODIFIERS.join(", "));
-  const [interpreter, setInterpreter] = useState("codon-interpreter:v1");
-  const [context, setContext] = useState("mRNA sequence translation efficiency mapping");
-  const [authority, setAuthority] = useState("wallet-owner");
+  const [interpreter, setInterpreter] = useState(DEMO_INTERPRETER);
+  const [context, setContext] = useState(DEMO_CONTEXT);
+  const [authority, setAuthority] = useState(DEMO_AUTHORITY);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CreateResult | null>(null);
@@ -49,6 +61,20 @@ export function CreateExperience() {
   const [providers, setProviders] = useState<DiscoveredProvider[]>([]);
 
   const parsedModifiers = parseModifierInput(modifiers);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      const c = searchParams.get("content");
+      const t = searchParams.get("title");
+      const d = searchParams.get("domain") || searchParams.get("category");
+      setTimeout(() => {
+        if (c) setContent(c);
+        if (t) setTitle(t);
+        if (d) setDomain(d);
+      }, 0);
+    }
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -96,11 +122,24 @@ export function CreateExperience() {
     setError(null);
 
     try {
+      if (contentMode === "encrypted" && !passphrase.trim()) {
+        throw new Error("Enter a passphrase before creating an encrypted memory.");
+      }
+
+      const encryptedContent =
+        contentMode === "encrypted" ? await encryptString(content, passphrase) : undefined;
+
       const memoryResult = await createMemoryNode({
         title,
         content,
         domain,
         visibility,
+        contentMode,
+        encryptedContent,
+        contentPreview:
+          contentMode === "plaintext"
+            ? content
+            : `${content.slice(0, 96)}${content.length > 96 ? "..." : ""}`,
       });
 
       setResult({
@@ -137,7 +176,7 @@ export function CreateExperience() {
       <section className="grid content-start gap-6">
         <div>
           <h1 className="max-w-3xl text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
-            Create a portable memory and bind it to modifiers.
+            Save a memory your AI will carry with it
           </h1>
           <p className="mt-4 max-w-2xl text-lg leading-8 text-slate-600">
             Every MemoryNode and ModifierStack is written with the project attribute{" "}
@@ -153,7 +192,7 @@ export function CreateExperience() {
           className="grid gap-5 rounded-xl border border-slate-200 bg-white p-5 shadow-[0_20px_50px_rgba(15,23,42,0.08)]"
         >
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Memory title">
+            <Field label="What do you want to remember?">
               <input
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
@@ -161,7 +200,7 @@ export function CreateExperience() {
                 required
               />
             </Field>
-            <Field label="Domain">
+            <Field label="Category">
               <input
                 value={domain}
                 onChange={(event) => setDomain(event.target.value)}
@@ -180,7 +219,24 @@ export function CreateExperience() {
             />
           </Field>
 
-          <div className="grid gap-4 sm:grid-cols-[0.8fr_1.2fr]">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="Storage mode">
+              <select
+                value={contentMode}
+                onChange={(event) => {
+                  const nextMode = event.target.value as ContentMode;
+                  setContentMode(nextMode);
+                  if (nextMode === "encrypted") {
+                    setVisibility("private");
+                  }
+                }}
+                className="input"
+              >
+                <option value="plaintext">Public (readable by anyone)</option>
+                <option value="metadata-only">Private content, public labels</option>
+                <option value="encrypted">Encrypted (only you can read)</option>
+              </select>
+            </Field>
             <Field label="Visibility">
               <select
                 value={visibility}
@@ -192,7 +248,33 @@ export function CreateExperience() {
                 <option value="public">public</option>
               </select>
             </Field>
-            <Field label="Modifiers">
+            {contentMode === "encrypted" ? (
+              <div className="grid gap-2">
+                <Field label="Passphrase">
+                  <input
+                    type="password"
+                    value={passphrase}
+                    onChange={(event) => setPassphrase(event.target.value)}
+                    className="input"
+                    autoComplete="new-password"
+                    required
+                  />
+                </Field>
+                <div className="text-xs font-semibold text-indigo-600 mt-1">
+                  🔒 Your content is encrypted in your browser before being stored. Even Arkiv cannot read it.
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-slate-200 bg-[#f8fbff] p-3 text-xs font-semibold leading-5 text-slate-600">
+                {contentMode === "metadata-only"
+                  ? "Only preview metadata and query attributes will be written."
+                  : "Raw content will be visible in the public Arkiv payload."}
+              </div>
+            )}
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-[0.8fr_1.2fr]">
+            <Field label="How should AI interpret this? (modifiers)">
               <textarea
                 value={modifiers}
                 onChange={(event) => setModifiers(event.target.value)}
@@ -309,7 +391,7 @@ export function CreateExperience() {
             ) : (
               <PlusCircle className="h-4 w-4" aria-hidden />
             )}
-            {isSubmitting ? "Writing to Arkiv" : "Create MemoryNode + ModifierStack"}
+            {isSubmitting ? "Writing to Arkiv" : "Save to Arkiv Blockchain"}
           </button>
         </form>
       </section>

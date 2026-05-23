@@ -10,6 +10,7 @@ import {
   custom,
   createPublicClient as createViemPublicClient,
   http,
+  isAddress,
   isHex,
   toHex,
   type Address,
@@ -25,6 +26,7 @@ import {
   ARKIV_MIN_MAX_FEE_PER_GAS_WEI,
   DEFAULT_ENTITY_TTL_SECONDS,
   PROJECT_ATTRIBUTE,
+  SCHEMA_VERSION,
 } from "./constants";
 import {
   agentReflectionAttributes,
@@ -43,9 +45,11 @@ import {
   type CreateAgentReflectionInput,
   type CreateMemoryInput,
   type CreateModifierStackInput,
+  type ContentMode,
   type MemoryNodePayload,
   type ModifierStackPayload,
   type ModifierVaultPayload,
+  type Visibility,
 } from "./schema";
 
 type Eip1193Provider = {
@@ -566,31 +570,93 @@ export async function readMemoryNode(key: string) {
   return record;
 }
 
-export async function queryMemoryNodes(limit = 25) {
-  const result = await publicClient
-    .buildQuery()
-    .where([eq("project", PROJECT_ATTRIBUTE), eq("entityType", "MemoryNode")])
-    .withPayload()
-    .withAttributes()
-    .withMetadata()
-    .orderBy("createdAt", "string", "desc")
-    .limit(limit)
-    .fetch();
+function applyOwnerFilters<T extends ReturnType<typeof publicClient.buildQuery>>(
+  query: T,
+  options: { owner?: string; creator?: string },
+) {
+  let nextQuery = query;
+
+  if (options.owner && isAddress(options.owner)) {
+    nextQuery = nextQuery.ownedBy(options.owner as Hex) as T;
+  }
+
+  if (options.creator && isAddress(options.creator)) {
+    nextQuery = nextQuery.createdBy(options.creator as Hex) as T;
+  }
+
+  return nextQuery;
+}
+
+export type QueryMemoryNodeOptions = {
+  domain?: string;
+  contentMode?: ContentMode;
+  visibility?: Visibility;
+  owner?: string;
+  creator?: string;
+  includeLegacy?: boolean;
+  limit?: number;
+};
+
+export async function queryMemoryNodes(options: QueryMemoryNodeOptions | number = {}) {
+  const normalizedOptions = typeof options === "number" ? { limit: options } : options;
+  const predicates = [
+    eq("project", PROJECT_ATTRIBUTE),
+    eq("entityType", "MemoryNode"),
+  ];
+
+  if (!normalizedOptions.includeLegacy) {
+    predicates.push(eq("schemaVersion", SCHEMA_VERSION));
+  }
+
+  if (normalizedOptions.domain?.trim()) {
+    predicates.push(eq("domain", normalizedOptions.domain.trim()));
+  }
+
+  if (normalizedOptions.contentMode) {
+    predicates.push(eq("contentMode", normalizedOptions.contentMode));
+  }
+
+  if (normalizedOptions.visibility) {
+    predicates.push(eq("visibility", normalizedOptions.visibility));
+  }
+
+  const query = applyOwnerFilters(
+    publicClient
+      .buildQuery()
+      .where(predicates)
+      .withPayload()
+      .withAttributes()
+      .withMetadata()
+      .orderBy("createdAt", "string", "desc")
+      .limit(normalizedOptions.limit ?? 25),
+    normalizedOptions,
+  );
+
+  const result = await query.fetch();
 
   return result.entities
     .map((entity) => entityToRecord<MemoryNodePayload>(entity))
     .filter((record) => isMemoryNodePayload(record.payload));
 }
 
-export async function queryModifierStacks(options: {
+export type QueryModifierStackOptions = {
   memoryKey?: string;
   modifier?: string;
+  interpreter?: string;
+  authority?: string;
+  includeLegacy?: boolean;
   limit?: number;
-} = {}) {
+};
+
+export async function queryModifierStacks(options: QueryModifierStackOptions = {}) {
   const predicates = [
     eq("project", PROJECT_ATTRIBUTE),
     eq("entityType", "ModifierStack"),
   ];
+
+  if (!options.includeLegacy) {
+    predicates.push(eq("schemaVersion", SCHEMA_VERSION));
+  }
 
   if (options.memoryKey) {
     predicates.push(eq("memoryKey", options.memoryKey));
@@ -598,6 +664,14 @@ export async function queryModifierStacks(options: {
 
   if (options.modifier) {
     predicates.push(eq(modifierAttributeKey(options.modifier), "true"));
+  }
+
+  if (options.interpreter?.trim()) {
+    predicates.push(eq("interpreter", options.interpreter.trim()));
+  }
+
+  if (options.authority?.trim()) {
+    predicates.push(eq("authority", options.authority.trim()));
   }
 
   const result = await publicClient
@@ -615,15 +689,24 @@ export async function queryModifierStacks(options: {
     .filter((record) => isModifierStackPayload(record.payload));
 }
 
-export async function queryAgentReflections(options: {
+export type QueryAgentReflectionOptions = {
   memoryKey?: string;
   modifierStackKey?: string;
+  interpreter?: string;
+  previousReflectionKey?: string;
+  includeLegacy?: boolean;
   limit?: number;
-} = {}) {
+};
+
+export async function queryAgentReflections(options: QueryAgentReflectionOptions = {}) {
   const predicates = [
     eq("project", PROJECT_ATTRIBUTE),
     eq("entityType", "AgentReflection"),
   ];
+
+  if (!options.includeLegacy) {
+    predicates.push(eq("schemaVersion", SCHEMA_VERSION));
+  }
 
   if (options.memoryKey) {
     predicates.push(eq("memoryKey", options.memoryKey));
@@ -631,6 +714,14 @@ export async function queryAgentReflections(options: {
 
   if (options.modifierStackKey) {
     predicates.push(eq("modifierStackKey", options.modifierStackKey));
+  }
+
+  if (options.interpreter?.trim()) {
+    predicates.push(eq("interpreter", options.interpreter.trim()));
+  }
+
+  if (options.previousReflectionKey) {
+    predicates.push(eq("previousReflectionKey", options.previousReflectionKey));
   }
 
   const result = await publicClient
@@ -648,9 +739,13 @@ export async function queryAgentReflections(options: {
     .filter((record) => isAgentReflectionPayload(record.payload));
 }
 
-export async function queryMemoryNodesByModifier(modifier: string, limit = 25) {
+export async function queryMemoryNodesByModifier(
+  modifier: string,
+  limit = 25,
+  options: Omit<QueryModifierStackOptions, "modifier" | "limit"> = {},
+) {
   const normalized = normalizeModifier(modifier);
-  const stacks = await queryModifierStacks({ modifier: normalized, limit });
+  const stacks = await queryModifierStacks({ ...options, modifier: normalized, limit });
   const keys = Array.from(new Set(stacks.map((stack) => stack.payload.memoryKey)));
   const memories = await Promise.allSettled(keys.map((key) => readMemoryNode(key)));
 
@@ -663,10 +758,11 @@ export async function queryMemoryNodesByModifier(modifier: string, limit = 25) {
 }
 
 export async function readMemoryGraph(memoryKey: string) {
-  const [memory, stacks, reflections] = await Promise.all([
-    readMemoryNode(memoryKey),
-    queryModifierStacks({ memoryKey }),
-    queryAgentReflections({ memoryKey }),
+  const memory = await readMemoryNode(memoryKey);
+  const includeLegacy = memory.payload.schemaVersion !== SCHEMA_VERSION;
+  const [stacks, reflections] = await Promise.all([
+    queryModifierStacks({ memoryKey, includeLegacy }),
+    queryAgentReflections({ memoryKey, includeLegacy }),
   ]);
 
   return { memory, stacks, reflections };

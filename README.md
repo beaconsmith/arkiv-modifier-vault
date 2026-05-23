@@ -6,23 +6,26 @@ User-owned AI memory on Arkiv Braga testnet.
 
 ## Theme
 
-**Theme: AI.** ModifierVault demonstrates agents whose memory is owned by the user, not the platform. A connected wallet writes AI memory objects to Arkiv, then reads and queries them back through Arkiv attributes.
+**Theme: AI primary, Privacy secondary.** ModifierVault demonstrates portable, user-owned semantic memory for AI agents. A connected wallet writes memories, modifier stacks, and agent reflections to Arkiv; optional client-side encryption keeps sensitive payloads confidential while public attributes remain queryable.
 
-Privacy is treated as a design constraint in this MVP: entities include visibility metadata and wallet ownership, but payloads are intentionally transparent on the public Braga testnet. Do not store sensitive plaintext in the demo.
+The privacy model separates semantic structure from semantic payload. Ownership, provenance, lineage, domains, modifiers, and content modes can stay public and searchable; raw memory content can be omitted or encrypted locally before it is written to Braga.
 
 ## What It Does
 
 ModifierVault stores a small AI memory graph on Arkiv:
 
-- `MemoryNode`: the user-owned memory payload.
+- `MemoryNode`: the user-owned memory payload or encrypted payload envelope.
 - `ModifierStack`: queryable instructions that describe how an agent should expand, route, transform, or remember the memory.
-- `AgentReflection`: an optional third entity that records a later agent interpretation linked back to the memory and stack.
+- `AgentReflection`: an AI-generated semantic interpretation artifact linked back to the memory and stack.
 
 Every entity and every query uses this unique project attribute:
 
 ```txt
 project = "modifiervault_beaconsmith_ethns_2026"
+schemaVersion = "2"
 ```
+
+New schema v2 entities use `schemaVersion = "2"` on payloads and attributes so the public demo can filter out older hackathon seed data while direct entity-key reads still work.
 
 ## Architecture
 
@@ -38,6 +41,7 @@ flowchart LR
   Braga --> Reflection["AgentReflection entity"]
   Stack -- "memoryKey attribute" --> Memory
   Reflection -- "memoryKey + modifierStackKey attributes" --> Memory
+  Reflection -- "previousReflectionKey attribute" --> Reflection
   UI --> Query["Project-scoped Arkiv queries"]
   Query --> Braga
 ```
@@ -46,15 +50,28 @@ Key Arkiv concepts used:
 
 - Payloads are JSON and use `contentType: "application/json"`.
 - Attributes power indexing and relationships.
+- `schemaVersion`, `contentMode`, `domain`, `interpreter`, and modifier attributes power semantic graph queries.
 - `expiresIn` is configurable through `NEXT_PUBLIC_ARKIV_EXPIRES_IN_SECONDS`.
 - `$owner` is the wallet that can update/delete an entity.
 - `$creator` is immutable attribution for who created the entity.
+
+## Privacy Modes
+
+| Mode | Arkiv payload | Queryable attributes |
+| --- | --- | --- |
+| Public memory | Plain JSON content | Project, schema, type, domain, visibility, contentMode |
+| Metadata-only memory | Preview and metadata only | Same query fields, no raw memory content |
+| Encrypted memory | AES-GCM encrypted envelope | Same query fields, ciphertext only |
+
+Encrypted mode uses the browser Web Crypto API with PBKDF2 -> AES-GCM. The app does not store the passphrase. To generate an AI reflection from encrypted content, the user must decrypt locally and explicitly send the decrypted content to the reflection generator.
 
 ## Tech Stack
 
 - Next.js App Router, React, TypeScript
 - Arkiv SDK `@arkiv-network/sdk`
 - Viem wallet transport for browser signing
+- Web Crypto API for local payload encryption
+- Groq Chat Completions for AgentReflection generation
 - Vercel deployment
 - MIT license
 
@@ -93,30 +110,33 @@ Environment variables:
 NEXT_PUBLIC_ARKIV_RPC_URL=https://braga.hoodi.arkiv.network/rpc
 NEXT_PUBLIC_ARKIV_EXPLORER_URL=https://explorer.braga.hoodi.arkiv.network
 NEXT_PUBLIC_ARKIV_EXPIRES_IN_SECONDS=2592000
+GROQ_API_KEY=gsk_YOUR_GROQ_API_KEY
+GROQ_MODEL=llama-3.1-8b-instant
 
-# Optional. Needed only for the CLI smoke test.
+# Optional. Needed only for the Braga CLI smoke test.
 ARKIV_PRIVATE_KEY=0xYOUR_BRAGA_TESTNET_PRIVATE_KEY
 ```
 
-Never expose a private key as `NEXT_PUBLIC_*`.
+Never expose a private key or AI provider key as `NEXT_PUBLIC_*`.
 
 ## Demo Flow
 
 1. Open the [live demo](https://modifiervault.vercel.app).
 2. Go to `/create`.
 3. Connect a browser wallet and switch to Arkiv Braga when prompted.
-4. Create the seeded `MemoryNode` and linked `ModifierStack`.
-5. Open the generated `/memory/[key]` route to inspect owner, creator, payload, attributes, and linked entities.
-6. Go to `/query` and search by modifier, memory key, or the project-scoped default query.
-7. Optionally add an `AgentReflection` to show agent memory continuing under the user's wallet.
+4. Create the seeded `Private Thinking Pattern` as public, metadata-only, or encrypted memory.
+5. Open the generated `/memory/[key]` route to inspect owner, creator, payload mode, attributes, and linked entities.
+6. If encrypted, decrypt locally with the passphrase, then generate an AgentReflection through Groq.
+7. Write the AgentReflection to Arkiv and inspect lineage/provenance.
+8. Go to `/query` and search by modifier, domain, interpreter, owner, creator, memory key, visibility, or content mode.
 
 ## Verification
 
 Local checks:
 
 ```bash
-npm run lint
-npm run build
+npm run verify
+npm audit --audit-level=moderate
 ```
 
 Braga smoke test:
@@ -126,7 +146,7 @@ Braga smoke test:
 npm run test:braga
 ```
 
-The smoke test creates a `MemoryNode`, reads it back by key, then queries by `PROJECT_ATTRIBUTE` and `entityType`.
+The local smoke test verifies encryption/decryption, metadata-only non-leakage, and reflection prompt shape. The Braga smoke test creates a schema v2 `MemoryNode`, linked `ModifierStack`, and linked `AgentReflection`, then verifies project/schema/domain/modifier/interpreter queries.
 
 Recent verification evidence is tracked in [VERIFICATION.md](VERIFICATION.md).
 
@@ -134,7 +154,7 @@ Recent verification evidence is tracked in [VERIFICATION.md](VERIFICATION.md).
 
 | Field | Value |
 | --- | --- |
-| Theme | AI |
+| Theme | AI + Privacy |
 | GitHub repo | https://github.com/beaconsmith/arkiv-modifier-vault |
 | Demo link | https://modifiervault.vercel.app |
 | Demo video | Optional for submission; required for prize claim |
@@ -148,11 +168,11 @@ Submit at: https://forms.arkiv.network/ethns-arkiv-challenge
 
 Suggested 2-3 minute structure for the prize-claim video:
 
-1. Show the theme: user-owned AI memory, not platform-owned memory.
-2. Open `/create`, connect wallet, and create a memory graph on Braga.
-3. Open the memory detail route and point out `$owner`, `$creator`, attributes, payload, and entity keys.
-4. Query by project and modifier on `/query`.
-5. Add an `AgentReflection` and show how it links back through attributes.
+1. Show the theme: user-owned AI memory with optional confidential payloads.
+2. Open `/create`, choose encrypted mode, connect wallet, and create the `Private Thinking Pattern` graph on Braga.
+3. Open the memory route and point out `$owner`, `$creator`, schema v2 attributes, encrypted payload envelope, and Arkiv keys.
+4. Decrypt locally, generate an AgentReflection with Groq, and write it to Arkiv.
+5. Query by modifier, domain, interpreter, owner/creator, and content mode.
 
 ## License
 

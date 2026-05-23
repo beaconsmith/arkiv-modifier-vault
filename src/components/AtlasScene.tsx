@@ -40,7 +40,9 @@ export function AtlasScene() {
           <h1 className="max-w-4xl text-4xl font-black tracking-tight text-slate-950 sm:text-6xl">
             Modifiers are an atlas layer for AI memory.
           </h1>
-          <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">{APP_TAGLINE}</p>
+          <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
+            {APP_TAGLINE} Public attributes remain queryable while private payloads can stay encrypted.
+          </p>
           <div className="mt-6 flex flex-wrap gap-2">
             {DEMO_MODIFIERS.map((modifier, index) => (
               <ModifierToken key={modifier} modifier={modifier} index={index} />
@@ -91,7 +93,7 @@ export function AtlasScene() {
               Prompt memory
             </div>
             <p className="mt-3 text-xl font-black tracking-tight text-slate-950">
-              Codon Optimization Modifier Cache
+              Private Thinking Pattern
             </p>
           </div>
           <div className="hidden justify-center lg:flex">

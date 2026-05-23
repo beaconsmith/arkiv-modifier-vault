@@ -7,8 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:local": "tsx scripts/local-smoke.ts",
     "test:braga": "tsx scripts/braga-test.ts",
-    "verify": "npm run lint && npm run build"
+    "seed:demo": "tsx scripts/seed-demo.ts",
+    "verify": "npm run lint && npm run test:local && npm run build"
   },
   "dependencies": {
     "@arkiv-network/sdk": "^0.6.8",

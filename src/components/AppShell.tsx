@@ -11,9 +11,9 @@ import { WalletButton } from "./WalletButton";
 
 const navItems = [
   { href: "/", label: "Home", icon: BrainCircuit },
-  { href: "/create", label: "Create", icon: PlusCircle },
-  { href: "/query", label: "Query", icon: Search },
-  { href: "/atlas", label: "Atlas", icon: Map },
+  { href: "/create", label: "Store Memory", icon: PlusCircle },
+  { href: "/query", label: "Search", icon: Search },
+  { href: "/atlas", label: "Graph Atlas", icon: Map },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -30,7 +30,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </span>
             <span className="min-w-0">
               <span className="block text-base font-black tracking-tight">{APP_NAME}</span>
-              <span className="block text-xs font-semibold text-slate-500">User-owned AI memory</span>
+              <span className="block text-xs font-semibold text-slate-500">Your AI&apos;s memory, owned by your wallet</span>
             </span>
           </Link>
 

@@ -4,7 +4,18 @@ import type { ReactNode } from "react";
 
 import { MemoryGraph } from "@/components/MemoryGraph";
 import { ModifierToken } from "@/components/ModifierToken";
-import { APP_TAGLINE, DEMO_MEMORY_CONTENT, DEMO_MODIFIERS, PROJECT_ATTRIBUTE } from "@/lib/constants";
+import {
+  APP_TAGLINE,
+  DEMO_AUTHORITY,
+  DEMO_CONTEXT,
+  DEMO_INTERPRETER,
+  DEMO_MEMORY_CONTENT,
+  DEMO_MEMORY_DOMAIN,
+  DEMO_MEMORY_TITLE,
+  DEMO_MODIFIERS,
+  PROJECT_ATTRIBUTE,
+  SCHEMA_VERSION,
+} from "@/lib/constants";
 import type { ArkivEntityRecord, MemoryNodePayload, ModifierStackPayload } from "@/lib/schema";
 
 export default function Home() {
@@ -14,9 +25,11 @@ export default function Home() {
     payload: {
       entityType: "MemoryNode" as const,
       project: PROJECT_ATTRIBUTE,
-      title: "Base Modifier Cache",
-      content: DEMO_MEMORY_CONTENT,
-      domain: "biology/design",
+      schemaVersion: SCHEMA_VERSION,
+      title: DEMO_MEMORY_TITLE,
+      contentPreview: DEMO_MEMORY_CONTENT,
+      contentMode: "encrypted" as const,
+      domain: DEMO_MEMORY_DOMAIN,
       visibility: "private" as const,
       createdAt: new Date("2026-05-22T00:00:00.000Z").toISOString(),
     },
@@ -28,11 +41,12 @@ export default function Home() {
     payload: {
       entityType: "ModifierStack" as const,
       project: PROJECT_ATTRIBUTE,
+      schemaVersion: SCHEMA_VERSION,
       memoryKey: previewMemoryKey,
       modifiers: DEMO_MODIFIERS,
-      interpreter: "atlas-interpreter:v1",
-      context: "mRNA sequence translation efficiency mapping",
-      authority: "wallet-owner",
+      interpreter: DEMO_INTERPRETER,
+      context: DEMO_CONTEXT,
+      authority: DEMO_AUTHORITY,
       createdAt: new Date("2026-05-22T00:00:01.000Z").toISOString(),
     },
     attributes: [],
@@ -46,21 +60,20 @@ export default function Home() {
             {APP_TAGLINE}
           </h1>
           <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600">
-            ModifierVault writes MemoryNodes and ModifierStacks to Arkiv Braga so agent context can
-            be portable, inspectable, and owned by the wallet that created it.
+            Store and structure your AI&apos;s memory. ModifierVault writes semantic memories, modifier stacks, and agent reflections to Arkiv Braga. This ensures your AI&apos;s knowledge remains portable, auditable, and secure—without being locked into any single chat service.
           </p>
           <div className="mt-7 flex flex-col gap-3 sm:flex-row">
             <Link
               href="/create"
               className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-slate-950 px-5 text-sm font-black text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
             >
-              Create demo memory <ArrowRight className="h-4 w-4" aria-hidden />
+              Store a Memory <ArrowRight className="h-4 w-4" aria-hidden />
             </Link>
             <Link
               href="/query"
               className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-5 text-sm font-black text-slate-800 transition hover:-translate-y-0.5 hover:border-slate-950"
             >
-              Query Arkiv graph
+              Search Memory Graph
             </Link>
           </div>
           <div className="mt-7 flex flex-wrap gap-2">
@@ -73,26 +86,54 @@ export default function Home() {
         <MemoryGraph memory={previewMemory} stacks={[previewStack]} />
       </section>
 
+      {/* How it works strip */}
+      <section className="border-t border-slate-200/60 pt-10">
+        <h2 className="text-2xl font-black tracking-tight text-slate-950">How it works</h2>
+        <div className="mt-6 grid gap-6 md:grid-cols-3">
+          <div className="rounded-xl border border-slate-200/80 bg-white p-5">
+            <div className="text-xs font-bold uppercase tracking-wider text-indigo-600">Step 1</div>
+            <h3 className="mt-1 font-black text-slate-950">Store a Base Memory</h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              Save facts, logs, or system context to the Arkiv blockchain, bound directly to your wallet.
+            </p>
+          </div>
+          <div className="rounded-xl border border-slate-200/80 bg-white p-5">
+            <div className="text-xs font-bold uppercase tracking-wider text-rose-600">Step 2</div>
+            <h3 className="mt-1 font-black text-slate-950">Apply Modifier Stacks</h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              Layer transformation filters (like tone shifts or role-routing) to customize how the AI interprets the memory.
+            </p>
+          </div>
+          <div className="rounded-xl border border-slate-200/80 bg-white p-5">
+            <div className="text-xs font-bold uppercase tracking-wider text-cyan-600">Step 3</div>
+            <h3 className="mt-1 font-black text-slate-950">Generate & Save Reflections</h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              Run the prompt through Groq to see how the modifiers transform the output, then save the reflection to complete the chain.
+            </p>
+          </div>
+        </div>
+      </section>
+
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <FeatureCard
           icon={<Fingerprint className="h-5 w-5" aria-hidden />}
-          title="User-owned"
-          body="Memory belongs to the wallet, not the chat surface."
+          title="User-Owned"
+          body="Your data belongs to your cryptographic wallet, freeing your AI personality from closed-platform database lock-in."
         />
         <FeatureCard
           icon={<GitBranch className="h-5 w-5" aria-hidden />}
           title="Composable"
-          body="Stacks keep interpretation separate from the base memory."
+          body="Chain modifiers together in real-time, allowing you to tweak how AI behaves without altering the core memory."
         />
         <FeatureCard
           icon={<Eye className="h-5 w-5" aria-hidden />}
           title="Inspectable"
-          body="Keys, owners, creators, attributes, and payloads are visible."
+          body="Every transformation step, creator wallet, and timestamp is recorded publicly on the blockchain ledger for full auditability."
         />
         <FeatureCard
           icon={<LockKeyhole className="h-5 w-5" aria-hidden />}
-          title="Privacy-aware"
-          body="Visibility lives in the entity model for agent-side policy."
+          title="Selective Privacy"
+          body="Control your privacy: store your memory as public text, metadata-only summaries, or locally encrypted blobs."
         />
       </section>
 
