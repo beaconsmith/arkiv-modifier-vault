@@ -1,5 +1,7 @@
-import { Brain, GitBranch, KeyRound, Sparkles } from "lucide-react";
-import type { ReactNode } from "react";
+"use client";
+
+import { Brain, KeyRound, Sparkles } from "lucide-react";
+import { type ReactNode, useState, useEffect, useMemo, useRef } from "react";
 
 import { DEMO_MODIFIERS } from "@/lib/constants";
 import { getMemoryDisplayContent, getReflectionDisplayText } from "@/lib/schema";
@@ -10,9 +12,13 @@ import type {
   ModifierStackPayload,
 } from "@/lib/schema";
 
-
 import { EntityMeta } from "./EntityMeta";
 import { ModifierToken } from "./ModifierToken";
+
+interface NodePosition {
+  x: number;
+  y: number;
+}
 
 export function MemoryGraph({
   memory,
@@ -28,236 +34,379 @@ export function MemoryGraph({
   >;
 }) {
   const payload = memory?.payload;
-  const activeStacks = stacks ?? [];
+  const activeStacks = useMemo(() => stacks ?? [], [stacks]);
+
+  // Default dimensions
+  const nodeWidth = 240;
+  const nodeHeight = 110;
+
+  // Initialize node positions
+  const [positions, setPositions] = useState<Record<string, NodePosition>>({});
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const dragStart = useRef({ x: 0, y: 0 });
+  const nodeStart = useRef({ x: 0, y: 0 });
+
+  // Reset positions if data loads or changes
+  useEffect(() => {
+    const initialPositions: Record<string, NodePosition> = {
+      memory: { x: 30, y: 150 },
+    };
+
+    if (activeStacks.length > 0) {
+      activeStacks.slice(0, 3).forEach((stack, idx) => {
+        const key = stack.key ?? `stack-${idx}`;
+        const yPos = activeStacks.length === 1 ? 150 : activeStacks.length === 2 ? [90, 210][idx] : [50, 160, 270][idx];
+        initialPositions[key] = { x: 310, y: yPos };
+      });
+    } else {
+      initialPositions["stack-empty"] = { x: 310, y: 150 };
+    }
+
+    const visibleRefs = reflections.slice(0, 3);
+    if (visibleRefs.length > 0) {
+      visibleRefs.forEach((ref, idx) => {
+        const key = ref.key ?? `ref-${idx}`;
+        const yPos = visibleRefs.length === 1 ? 150 : visibleRefs.length === 2 ? [90, 210][idx] : [50, 160, 270][idx];
+        initialPositions[key] = { x: 590, y: yPos };
+      });
+    } else {
+      initialPositions["ref-empty"] = { x: 590, y: 150 };
+    }
+
+    Promise.resolve().then(() => setPositions(initialPositions));
+  }, [activeStacks, reflections]);
+
+  // Drag handlers
+  const handlePointerDown = (id: string, e: React.PointerEvent<HTMLDivElement>) => {
+    setActiveDragId(id);
+    const pos = positions[id] || { x: 0, y: 0 };
+    dragStart.current = { x: e.clientX, y: e.clientY };
+    nodeStart.current = { ...pos };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (id: string, e: React.PointerEvent<HTMLDivElement>) => {
+    if (activeDragId !== id) return;
+    const dx = e.clientX - dragStart.current.x;
+    const dy = e.clientY - dragStart.current.y;
+    setPositions((prev) => ({
+      ...prev,
+      [id]: {
+        x: Math.max(10, Math.min(800, nodeStart.current.x + dx)),
+        y: Math.max(10, Math.min(380, nodeStart.current.y + dy)),
+      },
+    }));
+  };
+
+  const handlePointerUp = () => {
+    setActiveDragId(null);
+  };
+
+  // Helper to draw bezier path between two nodes
+  const getBezierPath = (startId: string, endId: string) => {
+    const start = positions[startId];
+    const end = positions[endId];
+    if (!start || !end) return "";
+
+    const x1 = start.x + nodeWidth;
+    const y1 = start.y + nodeHeight / 2;
+    const x2 = end.x;
+    const y2 = end.y + nodeHeight / 2;
+
+    const controlOffset = Math.abs(x2 - x1) * 0.5;
+    return `M ${x1} ${y1} C ${x1 + controlOffset} ${y1}, ${x2 - controlOffset} ${y2}, ${x2} ${y2}`;
+  };
+
+  // Positions for lines
+  const memoryPos = positions["memory"];
 
   return (
     <section
       data-testid="memory-graph"
-      className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-[0_20px_50px_rgba(15,23,42,0.08)]"
+      className="relative overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4 shadow-[0_20px_50px_rgba(15,23,42,0.08)] select-none"
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(255,107,107,0.16),transparent_28%),radial-gradient(circle_at_85%_28%,rgba(6,214,160,0.18),transparent_24%),radial-gradient(circle_at_55%_78%,rgba(67,97,238,0.13),transparent_30%)]" />
-      <div className="relative grid gap-4">
-        <div className="min-h-[360px] min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-[#f8fbff]/86 p-4">
-          <div className="grid min-h-[320px] min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_64px_minmax(0,1fr)_64px_minmax(0,1fr)] md:items-center">
-            <GraphNode
-              testId="memory-graph-node-memory"
-              tone="coral"
-              icon={<Brain className="h-5 w-5" aria-hidden />}
-              title={payload?.title ?? "MemoryNode"}
-              subtitle={payload ? getMemoryDisplayContent(payload as MemoryNodePayload) : "Read or create a memory to reveal its payload."}
-            />
-            
-            <div className="relative h-full min-h-[100px] min-w-0 md:min-h-0">
-              <svg
-                className="absolute inset-0 h-full w-full"
-                preserveAspectRatio="none"
-                viewBox="0 0 100 100"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <style>{`
-                  @keyframes flow-glow {
-                    to {
-                      stroke-dashoffset: -24;
-                    }
-                  }
-                  .glow-line {
-                    stroke: url(#line-gradient-glow);
-                    stroke-width: 1.5;
-                    stroke-linecap: round;
-                  }
-                  .pulse-line {
-                    stroke: #4cc9f0;
-                    stroke-width: 2;
-                    stroke-dasharray: 6, 12;
-                    animation: flow-glow 1.5s linear infinite;
-                    filter: drop-shadow(0 0 3px #4cc9f0);
-                  }
-                `}</style>
-                <defs>
-                  <linearGradient id="line-gradient-glow" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#ff6b6b" />
-                    <stop offset="50%" stopColor="#4361ee" />
-                    <stop offset="100%" stopColor="#06d6a0" />
-                  </linearGradient>
-                </defs>
-                
-                {activeStacks.length === 0 ? (
-                  <>
-                    <path d="M 0 50 C 30 50, 70 50, 100 50" className="glow-line opacity-40" />
-                    <path d="M 0 50 C 30 50, 70 50, 100 50" className="pulse-line" />
-                  </>
-                ) : (
-                  activeStacks.slice(0, 3).map((_, idx) => {
-                    const yPositions = activeStacks.length === 1 ? [50] : activeStacks.length === 2 ? [35, 65] : [20, 50, 80];
-                    const yTarget = yPositions[idx] ?? 50;
-                    const pathData = `M 0 50 C 35 50, 65 ${yTarget}, 100 ${yTarget}`;
-                    return (
-                      <g key={idx}>
-                        <path d={pathData} className="glow-line opacity-40" />
-                        <path d={pathData} className="pulse-line" />
-                      </g>
-                    );
-                  })
-                )}
-              </svg>
-              <div className="absolute left-1/2 top-1/2 grid h-8 w-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-md z-10 hover:scale-110 transition duration-300">
-                <GitBranch className="h-4 w-4" aria-hidden />
-              </div>
-            </div>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(255,107,107,0.12),transparent_28%),radial-gradient(circle_at_85%_28%,rgba(6,214,160,0.14),transparent_24%),radial-gradient(circle_at_55%_78%,rgba(67,97,238,0.1),transparent_30%)] pointer-events-none" />
+      
+      <div className="text-xs font-bold text-slate-400 dark:text-slate-500 mb-2 flex justify-between items-center px-1">
+        <span>Click and drag nodes to reorganize view</span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-2 w-2 rounded-full bg-indigo-500 animate-pulse" />
+          Live interactive mode
+        </span>
+      </div>
 
-            <div className="grid min-w-0 gap-3">
-              {activeStacks.length ? (
-                activeStacks.slice(0, 3).map((stack, index) => (
+      <div className="relative min-h-[400px] w-full overflow-hidden rounded-lg border border-slate-100 dark:border-slate-800 bg-[#f8fbff]/70 dark:bg-slate-900/40 p-4">
+        
+        {/* SVG Connector overlay */}
+        <svg
+          className="absolute inset-0 h-full w-full pointer-events-none"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <style>{`
+            @keyframes flow-glow {
+              to {
+                stroke-dashoffset: -24;
+              }
+            }
+            .glow-line {
+              stroke: url(#line-gradient-glow);
+              stroke-width: 2;
+              stroke-linecap: round;
+            }
+            .pulse-line {
+              stroke: #4cc9f0;
+              stroke-width: 2.5;
+              stroke-dasharray: 6, 12;
+              animation: flow-glow 1.5s linear infinite;
+              filter: drop-shadow(0 0 3px #4cc9f0);
+            }
+          `}</style>
+          <defs>
+            <linearGradient id="line-gradient-glow" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#ff6b6b" />
+              <stop offset="50%" stopColor="#4361ee" />
+              <stop offset="100%" stopColor="#06d6a0" />
+            </linearGradient>
+          </defs>
+
+          {/* Links: Memory to Stacks */}
+          {memoryPos && (
+            <>
+              {activeStacks.length === 0 ? (
+                positions["stack-empty"] && (
+                  <g>
+                    <path d={getBezierPath("memory", "stack-empty")} className="glow-line opacity-40" />
+                    <path d={getBezierPath("memory", "stack-empty")} className="pulse-line" />
+                  </g>
+                )
+              ) : (
+                activeStacks.slice(0, 3).map((stack, idx) => {
+                  const key = stack.key ?? `stack-${idx}`;
+                  return positions[key] ? (
+                    <g key={key}>
+                      <path d={getBezierPath("memory", key)} className="glow-line opacity-40" />
+                      <path d={getBezierPath("memory", key)} className="pulse-line" />
+                    </g>
+                  ) : null;
+                })
+              )}
+            </>
+          )}
+
+          {/* Links: Stacks to Reflections */}
+          {activeStacks.slice(0, 3).map((stack, sIdx) => {
+            const sKey = stack.key ?? `stack-${sIdx}`;
+            return reflections.slice(0, 3).map((ref, rIdx) => {
+              const rKey = ref.key ?? `ref-${rIdx}`;
+              return positions[sKey] && positions[rKey] ? (
+                <g key={`${sKey}-${rKey}`}>
+                  <path d={getBezierPath(sKey, rKey)} className="glow-line opacity-30" />
+                  <path d={getBezierPath(sKey, rKey)} className="pulse-line opacity-80" />
+                </g>
+              ) : null;
+            });
+          })}
+        </svg>
+
+        {/* Nodes layer */}
+        <div className="absolute inset-0 pointer-events-none">
+          
+          {/* Memory Node */}
+          {positions["memory"] && (
+            <div
+              className="absolute pointer-events-auto"
+              style={{
+                left: `${positions["memory"].x}px`,
+                top: `${positions["memory"].y}px`,
+                width: `${nodeWidth}px`,
+                height: `${nodeHeight}px`,
+              }}
+              onPointerDown={(e) => handlePointerDown("memory", e)}
+              onPointerMove={(e) => handlePointerMove("memory", e)}
+              onPointerUp={handlePointerUp}
+            >
+              <GraphNode
+                tone="coral"
+                icon={<Brain className="h-5 w-5" aria-hidden />}
+                title={payload?.title ?? "MemoryNode"}
+                subtitle={payload ? getMemoryDisplayContent(payload as MemoryNodePayload) : "Read or create a memory to reveal its payload."}
+              />
+            </div>
+          )}
+
+          {/* Stack Nodes */}
+          {activeStacks.length ? (
+            activeStacks.slice(0, 3).map((stack, index) => {
+              const key = stack.key ?? `stack-${index}`;
+              const pos = positions[key];
+              return pos ? (
+                <div
+                  key={key}
+                  className="absolute pointer-events-auto"
+                  style={{
+                    left: `${pos.x}px`,
+                    top: `${pos.y}px`,
+                    width: `${nodeWidth}px`,
+                    height: `${nodeHeight}px`,
+                  }}
+                  onPointerDown={(e) => handlePointerDown(key, e)}
+                  onPointerMove={(e) => handlePointerMove(key, e)}
+                  onPointerUp={handlePointerUp}
+                >
                   <GraphNode
-                    key={stack.key ?? index}
-                    testId={`memory-graph-node-stack-${index}`}
                     tone={index % 2 ? "indigo" : "teal"}
                     icon={<Sparkles className="h-5 w-5" aria-hidden />}
                     title={`ModifierStack ${index + 1}`}
                     subtitle={(stack.payload?.modifiers ?? []).join(" -> ") || "Modifiers pending"}
                   />
-                ))
-              ) : (
+                </div>
+              ) : null;
+            })
+          ) : (
+            positions["stack-empty"] && (
+              <div
+                className="absolute pointer-events-auto"
+                style={{
+                  left: `${positions["stack-empty"].x}px`,
+                  top: `${positions["stack-empty"].y}px`,
+                  width: `${nodeWidth}px`,
+                  height: `${nodeHeight}px`,
+                }}
+                onPointerDown={(e) => handlePointerDown("stack-empty", e)}
+                onPointerMove={(e) => handlePointerMove("stack-empty", e)}
+                onPointerUp={handlePointerUp}
+              >
                 <GraphNode
-                  testId="memory-graph-node-stack-empty"
                   tone="teal"
                   icon={<Sparkles className="h-5 w-5" aria-hidden />}
                   title="ModifierStack"
                   subtitle="Apply expand, route, transform, and remember modifiers."
                 />
-              )}
-            </div>
-
-            <div className="relative h-full min-h-[100px] min-w-0 md:min-h-0">
-              <svg
-                className="absolute inset-0 h-full w-full"
-                preserveAspectRatio="none"
-                viewBox="0 0 100 100"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                {reflections.length === 0 ? (
-                  <>
-                    <path d="M 0 50 C 30 50, 70 50, 100 50" className="glow-line opacity-40" />
-                    <path d="M 0 50 C 30 50, 70 50, 100 50" className="pulse-line" />
-                  </>
-                ) : (
-                  Array.from({ length: Math.max(activeStacks.length, 1) }).map((_, sIdx) => {
-                    const sYPositions = activeStacks.length === 1 ? [50] : activeStacks.length === 2 ? [35, 65] : [20, 50, 80];
-                    const sY = sYPositions[sIdx] ?? 50;
-
-                    return Array.from({ length: Math.min(reflections.length, 3) }).map((_, rIdx) => {
-                      const rYPositions = Math.min(reflections.length, 3) === 1 ? [50] : Math.min(reflections.length, 3) === 2 ? [35, 65] : [20, 50, 80];
-                      const rY = rYPositions[rIdx] ?? 50;
-                      const pathData = `M 0 ${sY} C 35 ${sY}, 65 ${rY}, 100 ${rY}`;
-
-                      return (
-                        <g key={`${sIdx}-${rIdx}`}>
-                          <path d={pathData} className="glow-line opacity-40" />
-                          <path d={pathData} className="pulse-line" />
-                        </g>
-                      );
-                    });
-                  })
-                )}
-              </svg>
-              <div className="absolute left-1/2 top-1/2 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-indigo-200 bg-indigo-50 text-[10px] font-black text-indigo-600 shadow-md z-10 hover:scale-110 transition duration-300">
-                {reflections.length}
               </div>
-            </div>
+            )
+          )}
 
-            <div className="grid min-w-0 gap-3">
-              {reflections.length ? (
-                reflections.slice(0, 3).map((reflection, index) => (
+          {/* Reflection Nodes */}
+          {reflections.length ? (
+            reflections.slice(0, 3).map((reflection, index) => {
+              const key = reflection.key ?? `ref-${index}`;
+              const pos = positions[key];
+              return pos ? (
+                <div
+                  key={key}
+                  className="absolute pointer-events-auto"
+                  style={{
+                    left: `${pos.x}px`,
+                    top: `${pos.y}px`,
+                    width: `${nodeWidth}px`,
+                    height: `${nodeHeight}px`,
+                  }}
+                  onPointerDown={(e) => handlePointerDown(key, e)}
+                  onPointerMove={(e) => handlePointerMove(key, e)}
+                  onPointerUp={handlePointerUp}
+                >
                   <GraphNode
-                    key={reflection.key ?? index}
-                    testId={`memory-graph-node-reflection-${index}`}
                     tone="indigo"
                     icon={<Sparkles className="h-5 w-5" aria-hidden />}
                     title={`Interpretation ${index + 1}`}
                     subtitle={reflection.payload ? getReflectionDisplayText(reflection.payload as AgentReflectionPayload) : ""}
                   />
-                ))
-              ) : (
+                </div>
+              ) : null;
+            })
+          ) : (
+            positions["ref-empty"] && (
+              <div
+                className="absolute pointer-events-auto"
+                style={{
+                  left: `${positions["ref-empty"].x}px`,
+                  top: `${positions["ref-empty"].y}px`,
+                  width: `${nodeWidth}px`,
+                  height: `${nodeHeight}px`,
+                }}
+                onPointerDown={(e) => handlePointerDown("ref-empty", e)}
+                onPointerMove={(e) => handlePointerMove("ref-empty", e)}
+                onPointerUp={handlePointerUp}
+              >
                 <GraphNode
-                  testId="memory-graph-node-reflection-empty"
                   tone="indigo"
                   icon={<Sparkles className="h-5 w-5" aria-hidden />}
                   title="Interpretation"
                   subtitle="Save interpretations to execute modifiers."
                 />
-              )}
-            </div>
+              </div>
+            )
+          )}
+        </div>
+      </div>
+
+      <aside className="grid content-start gap-4 md:grid-cols-2 mt-4">
+        <div
+          data-testid="memory-graph-proof"
+          className="min-w-0 rounded-lg border border-slate-200 dark:border-slate-800 bg-[#fbffef] dark:bg-slate-900/30 p-4"
+        >
+          <div className="mb-3 flex items-center gap-2 text-sm font-black uppercase tracking-[0.14em] text-slate-500">
+            <KeyRound className="h-4 w-4 text-[#8ac926]" aria-hidden />
+            Arkiv proof
           </div>
+          <EntityMeta record={memory} />
         </div>
 
-        <aside className="grid content-start gap-4 md:grid-cols-2">
-          <div
-            data-testid="memory-graph-proof"
-            className="min-w-0 rounded-lg border border-slate-200 bg-[#fbffef] p-4"
-          >
-            <div className="mb-3 flex items-center gap-2 text-sm font-black uppercase tracking-[0.14em] text-slate-500">
-              <KeyRound className="h-4 w-4 text-[#8ac926]" aria-hidden />
-              Arkiv proof
-            </div>
-            <EntityMeta record={memory} />
+        <div
+          data-testid="memory-graph-active-modifiers"
+          className="min-w-0 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4"
+        >
+          <h3 className="text-sm font-black uppercase tracking-[0.14em] text-slate-500">
+            Active modifiers
+          </h3>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {(activeStacks[0]?.payload?.modifiers ?? DEMO_MODIFIERS).map((modifier, index) => (
+              <ModifierToken key={modifier} modifier={modifier} index={index} />
+            ))}
           </div>
-
-          <div
-            data-testid="memory-graph-active-modifiers"
-            className="min-w-0 rounded-lg border border-slate-200 bg-white p-4"
-          >
-            <h3 className="text-sm font-black uppercase tracking-[0.14em] text-slate-500">
-              Active modifiers
-            </h3>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {(activeStacks[0]?.payload?.modifiers ?? DEMO_MODIFIERS).map((modifier, index) => (
-                <ModifierToken key={modifier} modifier={modifier} index={index} />
-              ))}
-            </div>
-          </div>
-        </aside>
-      </div>
+        </div>
+      </aside>
     </section>
   );
 }
 
 function GraphNode({
-  testId,
   tone,
   icon,
   title,
   subtitle,
 }: {
-  testId?: string;
   tone: "coral" | "teal" | "indigo";
   icon: ReactNode;
   title: string;
   subtitle: string;
 }) {
   const tones = {
-    coral: "border-rose-200 bg-gradient-to-br from-rose-50/90 to-rose-100/40 text-rose-950 shadow-rose-100/20 hover:shadow-rose-100/40 hover:border-rose-300",
-    teal: "border-emerald-200 bg-gradient-to-br from-emerald-50/90 to-emerald-100/40 text-emerald-950 shadow-emerald-100/20 hover:shadow-emerald-100/40 hover:border-emerald-300",
-    indigo: "border-indigo-200 bg-gradient-to-br from-indigo-50/90 to-indigo-100/40 text-indigo-950 shadow-indigo-100/20 hover:shadow-indigo-100/40 hover:border-indigo-300",
+    coral: "border-rose-200 dark:border-rose-900/60 bg-gradient-to-br from-rose-50/90 to-rose-100/40 dark:from-rose-950/40 dark:to-rose-900/20 text-rose-950 dark:text-rose-100 shadow-rose-100/20 hover:shadow-rose-100/40 hover:border-rose-300 dark:hover:border-rose-800 cursor-grab active:cursor-grabbing",
+    teal: "border-emerald-200 dark:border-emerald-900/60 bg-gradient-to-br from-emerald-50/90 to-emerald-100/40 dark:from-emerald-950/40 dark:to-emerald-900/20 text-emerald-950 dark:text-emerald-100 shadow-emerald-100/20 hover:shadow-emerald-100/40 hover:border-emerald-300 dark:hover:border-emerald-800 cursor-grab active:cursor-grabbing",
+    indigo: "border-indigo-200 dark:border-indigo-900/60 bg-gradient-to-br from-indigo-50/90 to-indigo-100/40 dark:from-indigo-950/40 dark:to-indigo-900/20 text-indigo-950 dark:text-indigo-100 shadow-indigo-100/20 hover:shadow-indigo-100/40 hover:border-indigo-300 dark:hover:border-indigo-800 cursor-grab active:cursor-grabbing",
   };
 
   const iconTones = {
-    coral: "bg-rose-500/10 text-rose-600",
-    teal: "bg-emerald-500/10 text-emerald-600",
-    indigo: "bg-indigo-500/10 text-indigo-600",
+    coral: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
+    teal: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    indigo: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
   };
 
   return (
     <div
-      data-testid={testId}
-      className={`min-w-0 overflow-hidden rounded-xl border p-4 shadow-sm backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:shadow-md ${tones[tone]}`}
+      className={`h-full min-w-0 overflow-hidden rounded-xl border p-3 shadow-sm backdrop-blur-md transition-all duration-300 hover:shadow-md ${tones[tone]}`}
     >
-      <div className={`mb-3 grid h-10 w-10 place-items-center rounded-lg ${iconTones[tone]}`}>{icon}</div>
-      <h3 className="break-words text-base font-black tracking-tight [overflow-wrap:anywhere]">{title}</h3>
-      <p className="mt-2 overflow-hidden break-words text-sm leading-6 opacity-80 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:4] [overflow-wrap:anywhere]">
-        {subtitle}
-      </p>
+      <div className="flex items-start gap-2.5">
+        <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${iconTones[tone]}`}>{icon}</div>
+        <div className="min-w-0">
+          <h3 className="break-words text-xs font-black tracking-tight [overflow-wrap:anywhere] leading-4">{title}</h3>
+          <p className="mt-1 overflow-hidden break-words text-[10px] leading-3.5 opacity-80 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3] [overflow-wrap:anywhere]">
+            {subtitle}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

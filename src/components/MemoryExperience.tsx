@@ -46,6 +46,10 @@ import { EntityMeta } from "./EntityMeta";
 import { MemoryGraph } from "./MemoryGraph";
 import { ModifierToken } from "./ModifierToken";
 
+// Caching & Prompt Debugger
+import { useSecurity } from "@/context/SecurityContext";
+import { buildReflectionPrompt } from "@/lib/prompt-utils";
+
 type GraphState = {
   memory: ArkivEntityRecord<MemoryNodePayload>;
   stacks: ArkivEntityRecord<ModifierStackPayload>[];
@@ -102,6 +106,9 @@ export function MemoryExperience() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Security passphrase cache integration
+  const { getPassphrase, setPassphrase } = useSecurity();
+
   // Agent reflection form states
   const [reflectionText, setReflectionText] = useState("");
   const [selectedModel, setSelectedModel] = useState("groq");
@@ -124,6 +131,14 @@ export function MemoryExperience() {
   const [reflectionSuccess, setReflectionSuccess] = useState(false);
   const [wallet, setWallet] = useState<WalletConnection | null>(null);
   const [providers, setProviders] = useState<DiscoveredProvider[]>([]);
+
+  // Prompt sandboxing
+  const [customPromptText, setCustomPromptText] = useState("");
+  const [showPromptDebugger, setShowPromptDebugger] = useState(false);
+
+  // Live transaction progress tracking
+  const [txStep, setTxStep] = useState<"idle" | "payload" | "wallet" | "broadcasting">("idle");
+
   const effectiveSelectedStackKey = selectedStackKey || graph?.stacks[0]?.key || "";
   const selectedStack = graph?.stacks.find((stack) => stack.key === effectiveSelectedStackKey);
   const memoryContentMode = graph ? getMemoryContentMode(graph.memory.payload) : "plaintext";
@@ -133,6 +148,53 @@ export function MemoryExperience() {
       : graph
         ? getMemoryDisplayContent(graph.memory.payload)
         : "";
+
+  // Dynamic Prompt generation
+  const defaultPrompt = useMemo(() => {
+    if (!graph || !selectedStack) return "";
+    return buildReflectionPrompt({
+      memoryContent: memoryForAi,
+      modifiers: selectedStack.payload.modifiers,
+      interpreter: selectedStack.payload.interpreter,
+      context: selectedStack.payload.context,
+      authority: selectedStack.payload.authority,
+      priorReflections: graph.reflections
+        .map((r) => getReflectionDisplayText(r.payload))
+        .filter((r) => !r.startsWith("Encrypted"))
+        .slice(0, 5),
+    });
+  }, [graph, selectedStack, memoryForAi]);
+
+  useEffect(() => {
+    Promise.resolve().then(() => {
+      setCustomPromptText(defaultPrompt);
+    });
+  }, [defaultPrompt]);
+
+  // Session Passphrase Caching Hook
+  useEffect(() => {
+    if (memoryKey && graph?.memory.payload.encryptedContent && !decryptedMemory && !isDecrypting) {
+      const cached = getPassphrase(memoryKey);
+      if (cached) {
+        Promise.resolve().then(() => {
+          setDecryptPassphrase(cached);
+          setIsDecrypting(true);
+        });
+        decryptString(graph.memory.payload.encryptedContent, cached)
+          .then((decrypted) => {
+            setDecryptedMemory(decrypted);
+            setEncryptReflection(true);
+            setReflectionPassphrase(cached);
+          })
+          .catch(() => {
+            // cached key invalid or expired
+          })
+          .finally(() => {
+            setIsDecrypting(false);
+          });
+      }
+    }
+  }, [memoryKey, graph, getPassphrase, decryptedMemory, isDecrypting]);
 
   useEffect(() => {
     let isMounted = true;
@@ -248,20 +310,17 @@ export function MemoryExperience() {
     try {
       await connectWallet(providerUuid);
     } catch (err) {
-      setReflectionError(err instanceof Error ? err.message : "Connection failed");
-      setStackError(err instanceof Error ? err.message : "Connection failed");
+      setReflectionError(err instanceof Error ? err.message : "Wallet connection failed.");
     }
   };
 
   const handleCreateDefaultStack = async () => {
     if (!graph) return;
-
     setIsCreatingStack(true);
     setStackError(null);
-    setReflectionSuccess(false);
 
     try {
-      const result = await createModifierStack({
+      const { record: createdStack } = await createModifierStack({
         memoryKey,
         modifiers: DEMO_MODIFIERS,
         interpreter: DEMO_INTERPRETER,
@@ -269,23 +328,10 @@ export function MemoryExperience() {
         authority: DEMO_AUTHORITY,
       });
 
-      setSelectedStackKey(result.entityKey);
-      const createdStack = result.record;
-      setGraph((current) => {
-        if (!current || current.stacks.some((stack) => stack.key === createdStack.key)) {
-          return current;
-        }
-
-        return {
-          ...current,
-          stacks: [createdStack, ...current.stacks],
-        };
-      });
-
-      const refreshedGraph = await loadGraph();
-      if (!refreshedGraph?.stacks.some((stack) => stack.key === createdStack.key)) {
+      if (createdStack) {
         setGraph((current) => {
-          if (!current || current.stacks.some((stack) => stack.key === createdStack.key)) {
+          if (!current) return null;
+          if (current.stacks.some((s) => s.key === createdStack.key)) {
             return current;
           }
 
@@ -314,6 +360,7 @@ export function MemoryExperience() {
       if (!reflectionPassphrase) {
         setReflectionPassphrase(decryptPassphrase);
       }
+      setPassphrase(memoryKey, decryptPassphrase);
     } catch (err) {
       setDecryptError(err instanceof Error ? err.message : "Could not decrypt memory.");
       setDecryptedMemory("");
@@ -351,6 +398,7 @@ export function MemoryExperience() {
             .map((reflection) => getReflectionDisplayText(reflection.payload))
             .filter((reflection) => !reflection.startsWith("Encrypted"))
             .slice(0, 5),
+          customPrompt: customPromptText !== defaultPrompt ? customPromptText : undefined,
         }),
       });
 
@@ -381,7 +429,9 @@ export function MemoryExperience() {
     e.preventDefault();
     const stackKey = selectedStackKey || graph?.stacks[0]?.key;
     if (!graph || !stackKey) return;
+    
     setIsSubmittingReflection(true);
+    setTxStep("payload");
     setReflectionError(null);
     setReflectionSuccess(false);
 
@@ -391,14 +441,14 @@ export function MemoryExperience() {
       }
 
       const targetStack = graph.stacks.find((stack) => stack.key === stackKey);
-      const parentReflection = replyToKey
-        ? graph.reflections.find((r) => r.key === replyToKey)
-        : graph.reflections[0];
+
+      setTxStep("wallet");
       const encryptedReflection = encryptReflection
         ? await encryptString(reflectionText.trim(), reflectionPassphrase)
         : undefined;
       const reflectionContentMode: ContentMode = encryptReflection ? "encrypted" : "plaintext";
 
+      setTxStep("broadcasting");
       await createAgentReflection({
         memoryKey,
         modifierStackKey: stackKey,
@@ -409,8 +459,8 @@ export function MemoryExperience() {
         authority: targetStack?.payload.authority,
         contentMode: reflectionContentMode,
         encryptedReflection,
-        previousReflectionKey: parentReflection?.key,
-        lineageDepth: (parentReflection?.payload.lineageDepth ?? -1) + 1,
+        previousReflectionKey: replyToKey,
+        lineageDepth: replyToKey ? (graph.reflections.find(r => r.key === replyToKey)?.payload.lineageDepth ?? 0) + 1 : 0,
         promptHash,
       });
 
@@ -424,6 +474,7 @@ export function MemoryExperience() {
       setReflectionError(err instanceof Error ? err.message : "Failed to write agent reflection to Arkiv Braga.");
     } finally {
       setIsSubmittingReflection(false);
+      setTxStep("idle");
     }
   };
 
@@ -474,23 +525,23 @@ export function MemoryExperience() {
     return (
       <div key={reflection.key} className="relative mt-4">
         <div 
-          className="rounded-lg border border-slate-200 bg-slate-50/50 p-4 relative overflow-hidden shadow-sm transition-all hover:shadow"
+          className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 p-4 relative overflow-hidden shadow-sm transition-all hover:shadow"
           style={{ marginLeft: `${Math.min(depth, 4) * 1.5}rem` }}
         >
           {depth > 0 && (
-            <div className="absolute left-[-1.25rem] top-6 w-[1.25rem] border-t-2 border-dashed border-indigo-200" />
+            <div className="absolute left-[-1.25rem] top-6 w-[1.25rem] border-t-2 border-dashed border-indigo-200 dark:border-indigo-800/80" />
           )}
-          <div className="absolute top-0 right-0 bg-indigo-100 text-indigo-700 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider rounded-bl">
+          <div className="absolute top-0 right-0 bg-indigo-100 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider rounded-bl">
             {reflection.payload.model}
           </div>
-          <p className="text-sm italic text-slate-700 mt-2">
+          <p className="text-sm italic text-slate-700 dark:text-slate-350 mt-2">
             &ldquo;{getReflectionDisplayText(reflection.payload)}&rdquo;
           </p>
-          <div className="mt-4 grid gap-1 border-t border-slate-100 pt-3 text-xs text-slate-500">
+          <div className="mt-4 grid gap-1 border-t border-slate-100 dark:border-slate-800/80 pt-3 text-xs text-slate-500 dark:text-slate-400">
             <span>Interpreter: {reflection.payload.interpreter ?? "legacy"}</span>
             <span>Lineage depth: {reflection.payload.lineageDepth ?? 0}</span>
           </div>
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
             <span>{new Date(reflection.payload.createdAt).toLocaleDateString()}</span>
             <div className="flex items-center gap-3">
               <button
@@ -502,14 +553,14 @@ export function MemoryExperience() {
                     formElement.scrollIntoView({ behavior: "smooth" });
                   }
                 }}
-                className="inline-flex items-center gap-1 font-bold text-indigo-600 hover:text-indigo-800 hover:underline"
+                className="inline-flex items-center gap-1 font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 hover:underline cursor-pointer"
               >
                 <CornerDownRight className="h-3 w-3" />
                 Reply
               </button>
               <a
                 href={`/create?content=${encodeURIComponent(getReflectionDisplayText(reflection.payload))}&title=Reflection-${reflection.key.slice(2, 10)}&domain=${encodeURIComponent(graph?.memory.payload.domain || "")}`}
-                className="inline-flex items-center gap-1 font-bold text-slate-600 hover:text-slate-800 hover:underline"
+                className="inline-flex items-center gap-1 font-bold text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:underline"
               >
                 <Plus className="h-3 w-3" />
                 Use as memory
@@ -518,7 +569,7 @@ export function MemoryExperience() {
                 href={arkivExplorerEntityUrl(reflection.key)}
                 target="_blank"
                 rel="noreferrer"
-                className="font-mono text-[10px] hover:text-[#4361ee] underline"
+                className="font-mono text-[10px] hover:text-[#4361ee] dark:hover:text-[#4cc9f0] underline"
               >
                 Trace {truncateMiddle(reflection.key, 6, 4)}
               </a>
@@ -534,7 +585,7 @@ export function MemoryExperience() {
     <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 lg:px-8">
       <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
+          <h1 className="text-4xl font-black tracking-tight text-slate-950 dark:text-slate-100 sm:text-5xl">
             Your Memory + Interpretations
           </h1>
           <p className="mt-3 break-all font-mono text-sm font-bold text-slate-500">{memoryKey}</p>
@@ -543,7 +594,7 @@ export function MemoryExperience() {
           <button
             type="button"
             onClick={handleExportGraph}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-black text-slate-800 transition hover:-translate-y-0.5 hover:border-slate-950"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 text-sm font-black text-slate-800 dark:text-slate-200 transition hover:-translate-y-0.5 hover:border-slate-950 dark:hover:border-slate-200 cursor-pointer"
           >
             <Download className="h-4 w-4" />
             Export graph as JSON
@@ -551,7 +602,7 @@ export function MemoryExperience() {
           <button
             type="button"
             onClick={() => void loadGraph()}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-black text-slate-800 transition hover:-translate-y-0.5 hover:border-slate-950"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 text-sm font-black text-slate-800 dark:text-slate-200 transition hover:-translate-y-0.5 hover:border-slate-950 dark:hover:border-slate-200 cursor-pointer"
           >
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
@@ -564,16 +615,16 @@ export function MemoryExperience() {
       </section>
 
       {error ? (
-        <div className="rounded-lg border border-[#ff6b6b] bg-[#fff0f0] p-4 text-sm font-semibold text-[#9d0208]">
+        <div className="rounded-lg border border-[#ff6b6b] bg-[#fff0f0] dark:bg-red-950/20 p-4 text-sm font-semibold text-[#9d0208] dark:text-red-400">
           {error}
         </div>
       ) : null}
 
       {isLoading && !graph ? (
-        <div className="grid min-h-[420px] place-items-center rounded-xl border border-slate-200 bg-white">
+        <div className="grid min-h-[420px] place-items-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950">
           <div className="text-center">
             <Loader2 className="mx-auto h-8 w-8 animate-spin text-[#4361ee]" aria-hidden />
-            <p className="mt-3 text-sm font-bold text-slate-500">Reading Arkiv graph</p>
+            <p className="mt-3 text-sm font-bold text-slate-500 dark:text-slate-400">Reading Arkiv graph</p>
           </div>
         </div>
       ) : null}
@@ -588,29 +639,29 @@ export function MemoryExperience() {
 
           <section className="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
             <div className="grid gap-5">
-              <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h2 className="text-2xl font-black tracking-tight">{graph.memory.payload.title}</h2>
+              <article className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-5 shadow-sm">
+                <h2 className="text-2xl font-black tracking-tight text-slate-950 dark:text-slate-100">{graph.memory.payload.title}</h2>
                 {memoryContentMode === "encrypted" ? (
-                  <div className="mt-5 rounded-lg border p-4 transition-all">
+                  <div className="mt-5 rounded-lg border dark:border-slate-800 p-4 transition-all">
                     {!decryptedMemory ? (
-                      <div className="border-l-4 border-amber-500 bg-amber-50 p-4 mb-4 rounded">
+                      <div className="border-l-4 border-amber-500 bg-amber-50 dark:bg-amber-950/20 p-4 mb-4 rounded">
                         <div className="flex gap-2">
-                          <LockKeyhole className="h-5 w-5 text-amber-600 shrink-0" />
+                          <LockKeyhole className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
                           <div>
-                            <h4 className="text-sm font-black text-amber-800">This memory is encrypted</h4>
-                            <p className="mt-1 text-xs font-semibold leading-relaxed text-amber-700">
+                            <h4 className="text-sm font-black text-amber-800 dark:text-amber-300">This memory is encrypted</h4>
+                            <p className="mt-1 text-xs font-semibold leading-relaxed text-amber-700 dark:text-amber-450">
                               Only the passphrase holder can read this. The encrypted blob is public on Arkiv, but unreadable without your key.
                             </p>
                           </div>
                         </div>
                       </div>
                     ) : (
-                      <div className="border-l-4 border-emerald-500 bg-emerald-50 p-4 mb-4 rounded">
+                      <div className="border-l-4 border-emerald-500 bg-emerald-50 dark:bg-emerald-950/20 p-4 mb-4 rounded">
                         <div className="flex gap-2">
-                          <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+                          <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-450 shrink-0" />
                           <div>
-                            <h4 className="text-sm font-black text-emerald-800">Decrypted locally — never sent to a server</h4>
-                            <p className="mt-1 text-xs font-semibold leading-relaxed text-emerald-700">
+                            <h4 className="text-sm font-black text-emerald-800 dark:text-emerald-300">Decrypted locally — never sent to a server</h4>
+                            <p className="mt-1 text-xs font-semibold leading-relaxed text-emerald-700 dark:text-emerald-450">
                               Content is decrypted in your browser session using web crypto.
                             </p>
                           </div>
@@ -632,23 +683,23 @@ export function MemoryExperience() {
                           type="button"
                           onClick={() => void handleDecryptMemory()}
                           disabled={isDecrypting || !decryptPassphrase.trim()}
-                          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-black text-white disabled:opacity-60"
+                          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-slate-950 dark:bg-slate-800 px-4 text-sm font-black text-white dark:text-slate-100 disabled:opacity-60 cursor-pointer"
                         >
                           {isDecrypting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
                           Decrypt Memory
                         </button>
                       </div>
                     ) : (
-                      <div className="rounded-lg bg-slate-50 border border-slate-200 p-4 font-sans text-base leading-relaxed text-slate-800">
+                      <div className="rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 font-sans text-base leading-relaxed text-slate-800 dark:text-slate-250 ring-2 ring-emerald-500/10">
                         {decryptedMemory}
                       </div>
                     )}
                     {decryptError ? (
-                      <p className="mt-3 text-sm font-semibold text-[#9d0208]">{decryptError}</p>
+                      <p className="mt-3 text-sm font-semibold text-[#9d0208] dark:text-red-400">{decryptError}</p>
                     ) : null}
                   </div>
                 ) : (
-                  <p className="mt-3 text-lg leading-8 text-slate-700">{getMemoryDisplayContent(graph.memory.payload)}</p>
+                  <p className="mt-3 text-lg leading-8 text-slate-700 dark:text-slate-350">{getMemoryDisplayContent(graph.memory.payload)}</p>
                 )}
                 <dl className="mt-5 grid gap-3 sm:grid-cols-4">
                   <MiniMeta label="Category" value={graph.memory.payload.domain} />
@@ -659,24 +710,24 @@ export function MemoryExperience() {
               </article>
 
               {/* Agent Reflection Sandbox Panel */}
-              <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
+              <article className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-5 shadow-sm">
+                <div className="mb-4 flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
                   <Sparkles className="h-5 w-5 text-[#4361ee]" aria-hidden />
-                  <h2 className="text-xl font-black text-slate-950">AI Interpretations</h2>
+                  <h2 className="text-xl font-black text-slate-950 dark:text-slate-100">AI Interpretations</h2>
                 </div>
 
                 {graph.stacks.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-slate-300 bg-[#f8fbff] p-5">
-                    <div className="mb-3 grid h-10 w-10 place-items-center rounded-lg bg-white text-[#4361ee] ring-1 ring-slate-200">
+                  <div className="rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-[#f8fbff] dark:bg-slate-900/10 p-5">
+                    <div className="mb-3 grid h-10 w-10 place-items-center rounded-lg bg-white dark:bg-slate-900 text-[#4361ee] dark:text-[#4cc9f0] ring-1 ring-slate-200 dark:ring-slate-800">
                       <Sparkles className="h-5 w-5" aria-hidden />
                     </div>
                     <div className="grid gap-4">
-                      <p className="font-black text-slate-950">This memory is waiting for an interpretation layer.</p>
-                      <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">
+                      <p className="font-black text-slate-950 dark:text-slate-200">This memory is waiting for an interpretation layer.</p>
+                      <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600 dark:text-slate-400">
                         Create a linked modifier stack, then write the first agent reflection against it.
                       </p>
                       {stackError ? (
-                        <div className="rounded-lg border border-[#ff6b6b] bg-[#fff0f0] p-3 text-sm font-semibold text-[#9d0208]">
+                        <div className="rounded-lg border border-[#ff6b6b] bg-[#fff0f0] dark:bg-red-950/20 p-3 text-sm font-semibold text-[#9d0208] dark:text-red-400">
                           {stackError}
                         </div>
                       ) : null}
@@ -685,7 +736,7 @@ export function MemoryExperience() {
                           type="button"
                           onClick={() => void handleCreateDefaultStack()}
                           disabled={isCreatingStack}
-                          className="inline-flex h-11 w-fit items-center justify-center gap-2 rounded-lg bg-slate-950 px-5 text-sm font-black text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="inline-flex h-11 w-fit items-center justify-center gap-2 rounded-lg bg-slate-950 dark:bg-slate-800 px-5 text-sm font-black text-white dark:text-slate-100 transition hover:-translate-y-0.5 hover:bg-slate-800 dark:hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
                         >
                           {isCreatingStack ? (
                             <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
@@ -696,11 +747,11 @@ export function MemoryExperience() {
                         </button>
                       ) : (
                         <div className="grid gap-3">
-                          <p className="text-sm font-semibold text-slate-600">
+                          <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">
                             Connect a wallet to add the modifier stack for this memory.
                           </p>
                           {availableProviders().length === 0 ? (
-                            <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-600">
+                            <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 text-sm text-slate-600 dark:text-slate-400">
                               No browser wallet detected.
                             </div>
                           ) : (
@@ -710,7 +761,7 @@ export function MemoryExperience() {
                                   key={prov.uuid}
                                   type="button"
                                   onClick={() => void handleConnectProvider(prov.uuid)}
-                                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+                                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-350 shadow-sm transition hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
                                 >
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
                                   <img src={prov.icon} alt="" className="h-4 w-4 rounded object-contain" />
@@ -726,28 +777,28 @@ export function MemoryExperience() {
                 ) : (
                   <form onSubmit={handleCreateReflection} className="grid gap-4">
                     {reflectionSuccess && (
-                      <div className="flex items-center gap-3 rounded-lg border border-[#06d6a0] bg-[#ebfff8] p-3 text-sm font-bold text-[#006d5b]">
+                      <div className="flex items-center gap-3 rounded-lg border border-[#06d6a0] bg-[#ebfff8] dark:bg-emerald-950/20 p-3 text-sm font-bold text-[#006d5b] dark:text-emerald-400">
                         <CheckCircle2 className="h-5 w-5 shrink-0 text-[#06d6a0]" />
                         Reflection successfully recorded on Braga testnet!
                       </div>
                     )}
 
                     {reflectionError && (
-                      <div className="flex items-center gap-3 rounded-lg border border-[#ff6b6b] bg-[#fff0f0] p-3 text-sm font-semibold text-[#9d0208]">
+                      <div className="flex items-center gap-3 rounded-lg border border-[#ff6b6b] bg-[#fff0f0] dark:bg-red-950/20 p-3 text-sm font-semibold text-[#9d0208] dark:text-red-400">
                         <AlertCircle className="h-5 w-5 shrink-0 text-[#ff6b6b]" />
                         <span className="break-words">{reflectionError}</span>
                       </div>
                     )}
 
                     {replyToKey && (
-                      <div className="flex items-center justify-between rounded-lg bg-indigo-50 border border-indigo-200 px-3 py-2 text-xs font-bold text-indigo-700 mb-1">
+                      <div className="flex items-center justify-between rounded-lg bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-900/50 px-3 py-2 text-xs font-bold text-indigo-700 dark:text-indigo-300 mb-1">
                         <span>
                           Replying to parent interpretation: <code className="font-mono text-xs">{truncateMiddle(replyToKey, 8, 6)}</code>
                         </span>
                         <button
                           type="button"
                           onClick={() => setReplyToKey(undefined)}
-                          className="text-indigo-500 hover:text-indigo-800"
+                          className="text-indigo-500 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 cursor-pointer"
                         >
                           Cancel
                         </button>
@@ -755,7 +806,7 @@ export function MemoryExperience() {
                     )}
 
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <label className="grid gap-2 text-sm font-bold text-slate-700">
+                      <label className="grid gap-2 text-sm font-bold text-slate-700 dark:text-slate-350">
                         <span>Interpretation layer</span>
                         <select
                           value={effectiveSelectedStackKey}
@@ -771,7 +822,7 @@ export function MemoryExperience() {
                         </select>
                       </label>
 
-                      <label className="grid gap-2 text-sm font-bold text-slate-700">
+                      <label className="grid gap-2 text-sm font-bold text-slate-700 dark:text-slate-350">
                         <span>Choose a starting point (optional)</span>
                         <select
                           value={selectedPersona}
@@ -787,11 +838,11 @@ export function MemoryExperience() {
                       </label>
                     </div>
 
-                    <div className="rounded-lg border border-slate-200 bg-[#f8fbff] p-4">
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-[#f8fbff] dark:bg-slate-900/20 p-4">
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
-                          <p className="text-sm font-black text-slate-950">Generate semantic interpretation</p>
-                          <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+                          <p className="text-sm font-black text-slate-950 dark:text-slate-200">Generate semantic interpretation</p>
+                          <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">
                             Groq reads the selected memory, stack, interpreter, context, authority, and visible lineage.
                           </p>
                         </div>
@@ -804,7 +855,7 @@ export function MemoryExperience() {
                             !memoryForAi.trim() ||
                             memoryContentMode === "metadata-only"
                           }
-                          className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-black text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-slate-950 dark:bg-slate-850 px-4 text-sm font-black text-white dark:text-slate-100 transition hover:-translate-y-0.5 hover:bg-slate-800 dark:hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
                         >
                           {isGeneratingReflection ? (
                             <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
@@ -818,17 +869,51 @@ export function MemoryExperience() {
                       </div>
                     </div>
 
+                    {/* Collapsible Prompt Debugger Sandbox */}
+                    <div className="border border-slate-200 dark:border-slate-800 rounded-lg p-3 bg-slate-50/50 dark:bg-slate-900/10">
+                      <button
+                        type="button"
+                        onClick={() => setShowPromptDebugger(!showPromptDebugger)}
+                        className="flex items-center justify-between w-full text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <WandSparkles className="h-3.5 w-3.5 text-indigo-500" />
+                          Prompt Debugging Sandbox
+                        </span>
+                        <span>{showPromptDebugger ? "Hide ▲" : "Show prompt template ▼"}</span>
+                      </button>
+                      {showPromptDebugger && (
+                        <div className="mt-3 space-y-2">
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                            Inspect or modify the prompt generated from the memory context and active modifier operators:
+                          </p>
+                          <textarea
+                            value={customPromptText}
+                            onChange={(e) => setCustomPromptText(e.target.value)}
+                            className="w-full min-h-36 text-xs font-mono p-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 rounded"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setCustomPromptText(defaultPrompt)}
+                            className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline font-semibold cursor-pointer"
+                          >
+                            Revert to default prompt template
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
                     {reflectionText && selectedStack && (
-                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 mt-2">
-                        <h3 className="text-sm font-black uppercase tracking-wider text-slate-500 mb-3">
+                      <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/20 p-4 mt-2">
+                        <h3 className="text-sm font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3">
                           Transformation Trace
                         </h3>
-                        <div className="relative border-l-2 border-slate-300 pl-4 space-y-4">
+                        <div className="relative border-l-2 border-slate-300 dark:border-slate-700 pl-4 space-y-4">
                           {/* Original Memory */}
                           <div className="relative">
-                            <div className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-slate-400" />
-                            <h4 className="text-xs font-bold text-slate-500">Original Memory Content</h4>
-                            <p className="text-sm text-slate-700 mt-1 max-h-24 overflow-y-auto bg-white p-2 rounded border border-slate-200">
+                            <div className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-slate-400 dark:bg-slate-650" />
+                            <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400">Original Memory Content</h4>
+                            <p className="text-sm text-slate-700 dark:text-slate-300 mt-1 max-h-24 overflow-y-auto bg-white dark:bg-slate-900 p-2 rounded border border-slate-200 dark:border-slate-800">
                               {memoryForAi}
                             </p>
                           </div>
@@ -837,10 +922,10 @@ export function MemoryExperience() {
                           {selectedStack.payload.modifiers.map((mod, idx) => (
                             <div key={mod} className="relative">
                               <div className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-[#4cc9f0]" />
-                              <h4 className="text-xs font-bold text-slate-800">
-                                Modifier {idx + 1}: <code className="text-xs text-rose-600 bg-rose-50 px-1 py-0.5 rounded font-mono">{mod}</code>
+                              <h4 className="text-xs font-bold text-slate-800 dark:text-slate-250">
+                                Modifier {idx + 1}: <code className="text-xs text-rose-600 dark:text-rose-450 bg-rose-50 dark:bg-rose-950/20 px-1 py-0.5 rounded font-mono">{mod}</code>
                               </h4>
-                              <p className="text-xs text-slate-500 mt-0.5">
+                              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                                 {getModifierDescription(mod)}
                               </p>
                             </div>
@@ -849,8 +934,8 @@ export function MemoryExperience() {
                           {/* Final Reflection */}
                           <div className="relative">
                             <div className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                            <h4 className="text-xs font-bold text-emerald-600">Final Generated Reflection</h4>
-                            <p className="text-sm text-slate-700 mt-1 max-h-32 overflow-y-auto bg-emerald-50/50 p-2 rounded border border-emerald-200">
+                            <h4 className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Final Generated Reflection</h4>
+                            <p className="text-sm text-slate-700 dark:text-slate-300 mt-1 max-h-32 overflow-y-auto bg-emerald-50/50 dark:bg-emerald-950/10 p-2 rounded border border-emerald-200 dark:border-emerald-900/30">
                               {reflectionText}
                             </p>
                           </div>
@@ -858,7 +943,7 @@ export function MemoryExperience() {
                       </div>
                     )}
 
-                    <label className="grid gap-2 text-sm font-bold text-slate-700">
+                    <label className="grid gap-2 text-sm font-bold text-slate-700 dark:text-slate-300">
                       <span>Reflection Text</span>
                       <textarea
                         value={reflectionText}
@@ -872,8 +957,8 @@ export function MemoryExperience() {
                       />
                     </label>
 
-                    <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-[auto_1fr] sm:items-center">
-                      <label className="inline-flex items-center gap-2 text-sm font-black text-slate-700">
+                    <div className="grid gap-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:grid-cols-[auto_1fr] sm:items-center">
+                      <label className="inline-flex items-center gap-2 text-sm font-black text-slate-700 dark:text-slate-300">
                         <input
                           type="checkbox"
                           checked={encryptReflection}
@@ -892,17 +977,59 @@ export function MemoryExperience() {
                           autoComplete="new-password"
                         />
                       ) : (
-                        <p className="text-xs font-semibold text-slate-500">
+                        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                           Plaintext reflections are public on Braga.
                         </p>
                       )}
                     </div>
 
+                    {isSubmittingReflection && (
+                      <div className="border border-indigo-100 dark:border-indigo-900/50 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-lg p-4 transition-all">
+                        <h4 className="text-xs font-black uppercase tracking-wider text-indigo-700 dark:text-indigo-400 mb-3 flex items-center gap-1.5">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          Blockchain Transaction Progress
+                        </h4>
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2.5 text-xs font-bold">
+                            <span className={`h-4.5 w-4.5 rounded-full flex items-center justify-center text-[10px] ${
+                              txStep === "payload" ? "bg-indigo-600 text-white animate-pulse" : "bg-emerald-500 text-white"
+                            }`}>
+                              {txStep === "payload" ? "1" : "✓"}
+                            </span>
+                            <span className={txStep === "payload" ? "text-indigo-900 dark:text-indigo-200" : "text-slate-500 dark:text-slate-400"}>
+                              Preparing encrypted reflection payload
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2.5 text-xs font-bold">
+                            <span className={`h-4.5 w-4.5 rounded-full flex items-center justify-center text-[10px] ${
+                              txStep === "payload" ? "bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-650" :
+                              txStep === "wallet" ? "bg-indigo-600 text-white animate-pulse" : "bg-emerald-500 text-white"
+                            }`}>
+                              {txStep === "payload" ? "2" : txStep === "wallet" ? "2" : "✓"}
+                            </span>
+                            <span className={txStep === "wallet" ? "text-indigo-900 dark:text-indigo-200" : "text-slate-500 dark:text-slate-400"}>
+                              Awaiting wallet signature authorization
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2.5 text-xs font-bold">
+                            <span className={`h-4.5 w-4.5 rounded-full flex items-center justify-center text-[10px] ${
+                              txStep === "broadcasting" ? "bg-indigo-600 text-white animate-pulse" : "bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-650"
+                            }`}>
+                              3
+                            </span>
+                            <span className={txStep === "broadcasting" ? "text-indigo-900 dark:text-indigo-200" : "text-slate-500 dark:text-slate-400"}>
+                              Broadcasting to Braga Ledger & confirming transaction
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {wallet ? (
                       <button
                         type="submit"
                         disabled={isSubmittingReflection || !reflectionText.trim()}
-                        className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 text-sm font-black text-white transition hover:-translate-y-0.5 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 text-sm font-black text-white transition hover:-translate-y-0.5 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
                       >
                         {isSubmittingReflection ? (
                           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
@@ -912,12 +1039,12 @@ export function MemoryExperience() {
                         {isSubmittingReflection ? "Signing Reflection Transaction..." : "Save this Interpretation to Blockchain"}
                       </button>
                     ) : (
-                      <div className="flex flex-col gap-3 rounded-lg border border-[#ffd166] bg-[#fffdf0] p-4 text-sm text-[#8a6d00] mt-2">
+                      <div className="flex flex-col gap-3 rounded-lg border border-[#ffd166] bg-[#fffdf0] dark:bg-amber-950/10 p-4 text-sm text-[#8a6d00] dark:text-amber-400 mt-2">
                         <div className="flex items-center gap-3">
                           <Wallet className="h-5 w-5 shrink-0 text-[#f5a623] animate-pulse" />
                           <div>
                             <p className="font-bold">Wallet connection required</p>
-                            <p className="text-xs text-slate-500 mt-0.5">Please connect your wallet to record reflections on Braga:</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-450 mt-0.5">Please connect your wallet to record reflections on Braga:</p>
                           </div>
                         </div>
                         {(() => {
@@ -925,7 +1052,7 @@ export function MemoryExperience() {
 
                           if (providersForReflection.length === 0) {
                             return (
-                              <div className="flex gap-2 rounded border border-[#ff6b6b] bg-[#fff0f0] p-2.5 text-xs font-semibold text-[#9d0208]">
+                              <div className="flex gap-2 rounded border border-[#ff6b6b] bg-[#fff0f0] dark:bg-red-950/20 p-2.5 text-xs font-semibold text-[#9d0208] dark:text-red-400">
                                 <AlertCircle className="h-4 w-4 shrink-0 text-[#ff6b6b]" />
                                 <span>No browser wallet extensions detected. Please install MetaMask, Rabby, Coinbase Wallet, or Phantom.</span>
                               </div>
@@ -939,7 +1066,7 @@ export function MemoryExperience() {
                                   key={prov.uuid}
                                   type="button"
                                   onClick={() => void handleConnectProvider(prov.uuid)}
-                                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700 shadow-sm transition"
+                                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm transition"
                                 >
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
                                   <img src={prov.icon} alt="" className="h-4 w-4 rounded object-contain" />
@@ -958,8 +1085,8 @@ export function MemoryExperience() {
 
             <aside className="grid gap-4 content-start">
               {graph.stacks.map((stack, index) => (
-                <div key={stack.key} className="rounded-xl border border-slate-200 bg-[#fbffef] p-5 shadow-sm">
-                  <h3 className="mb-3 text-sm font-black uppercase tracking-[0.14em] text-slate-500">
+                <div key={stack.key} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-[#fbffef] dark:bg-slate-900/10 p-5 shadow-sm">
+                  <h3 className="mb-3 text-sm font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
                     ModifierStack {index + 1}
                   </h3>
                   <div className="mb-3 flex flex-wrap gap-2">
@@ -967,20 +1094,20 @@ export function MemoryExperience() {
                       <ModifierToken key={item} modifier={item} index={itemIndex} />
                     ))}
                   </div>
-                  <p className="mb-4 text-sm leading-6 text-slate-600">{stack.payload.context}</p>
+                  <p className="mb-4 text-sm leading-6 text-slate-600 dark:text-slate-405">{stack.payload.context}</p>
                   <EntityMeta record={stack} />
                 </div>
               ))}
             </aside>
 
             {/* Agent Reflections History */}
-            <article className="rounded-xl border border-slate-200 bg-white p-5 lg:col-span-2 shadow-sm">
-              <h2 className="text-xl font-black tracking-tight flex items-center gap-2">
+            <article className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-5 lg:col-span-2 shadow-sm">
+              <h2 className="text-xl font-black tracking-tight flex items-center gap-2 text-slate-950 dark:text-slate-100">
                 <Sparkles className="h-5 w-5 text-[#4361ee]" aria-hidden />
                 AI Interpretations History ({graph.reflections.length})
               </h2>
               {graph.reflections.length === 0 ? (
-                <p className="mt-3 text-sm text-slate-500 italic">No interpretations written yet. Run the Sandbox form above to write the first interpretation.</p>
+                <p className="mt-3 text-sm text-slate-500 dark:text-slate-450 italic">No interpretations written yet. Run the Sandbox form above to write the first interpretation.</p>
               ) : (
                 <div className="mt-4 space-y-4">
                   {rootReflections.map((root) => renderReflectionNode(root, 0))}
@@ -996,9 +1123,9 @@ export function MemoryExperience() {
 
 function MiniMeta({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-[#f8fbff] p-3">
-      <dt className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">{label}</dt>
-      <dd className="mt-1 break-words text-sm font-bold text-slate-800">{value}</dd>
+    <div className="rounded-lg border border-slate-200 dark:border-slate-850 bg-[#f8fbff] dark:bg-slate-900/30 p-3">
+      <dt className="text-xs font-black uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">{label}</dt>
+      <dd className="mt-1 break-words text-sm font-bold text-slate-800 dark:text-slate-350">{value}</dd>
     </div>
   );
 }

@@ -61,7 +61,10 @@ export async function POST(request: Request) {
     );
   }
 
-  const prompt = buildReflectionPrompt(body);
+  const customPrompt = (body as ReflectionGenerationInput & { customPrompt?: string }).customPrompt;
+  const prompt = typeof customPrompt === "string" && customPrompt.trim() !== ""
+    ? customPrompt.trim()
+    : buildReflectionPrompt(body);
   const promptHash = hashReflectionPrompt(prompt);
 
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {

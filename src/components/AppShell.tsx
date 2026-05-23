@@ -1,9 +1,9 @@
 "use client";
 
-import { BrainCircuit, DatabaseZap, Map, PlusCircle, Search } from "lucide-react";
+import { BrainCircuit, DatabaseZap, Map, PlusCircle, Search, Sun, Moon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { type ReactNode, useState, useEffect } from "react";
 
 import { APP_NAME } from "@/lib/constants";
 
@@ -18,19 +18,44 @@ const navItems = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+
+  useEffect(() => {
+    const storedTheme = localStorage.getItem("theme") as "light" | "dark" | null;
+    const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    if (storedTheme === "dark" || (!storedTheme && systemPrefersDark)) {
+      Promise.resolve().then(() => setTheme("dark"));
+      document.documentElement.classList.add("dark");
+    } else {
+      Promise.resolve().then(() => setTheme("light"));
+      document.documentElement.classList.remove("dark");
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    if (theme === "light") {
+      setTheme("dark");
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("theme", "dark");
+    } else {
+      setTheme("light");
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-[#f7fafc] text-slate-950">
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-[linear-gradient(90deg,rgba(14,165,233,0.08)_1px,transparent_1px),linear-gradient(0deg,rgba(244,63,94,0.08)_1px,transparent_1px)] bg-[size:72px_72px]" />
-      <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-[#f7fafc]/90 backdrop-blur-xl">
+    <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-[linear-gradient(90deg,rgba(14,165,233,0.04)_1px,transparent_1px),linear-gradient(0deg,rgba(244,63,94,0.04)_1px,transparent_1px)] dark:bg-[linear-gradient(90deg,rgba(14,165,233,0.02)_1px,transparent_1px),linear-gradient(0deg,rgba(244,63,94,0.02)_1px,transparent_1px)] bg-[size:72px_72px]" />
+      <header className="sticky top-0 z-40 border-b border-slate-200/80 dark:border-slate-800/80 bg-background/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex min-w-0 items-center gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-950 text-white shadow-[0_12px_30px_rgba(15,23,42,0.18)]">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-950 dark:bg-slate-800 text-white shadow-[0_12px_30px_rgba(15,23,42,0.18)]">
               <DatabaseZap className="h-5 w-5 text-[#4cc9f0]" aria-hidden />
             </span>
             <span className="min-w-0">
               <span className="block text-base font-black tracking-tight">{APP_NAME}</span>
-              <span className="block text-xs font-semibold text-slate-500">Your AI&apos;s memory, owned by your wallet</span>
+              <span className="block text-xs font-semibold text-slate-500 dark:text-slate-400">Your AI&apos;s memory, owned by your wallet</span>
             </span>
           </Link>
 
@@ -45,8 +70,8 @@ export function AppShell({ children }: { children: ReactNode }) {
                   href={item.href}
                   className={`inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold transition ${
                     isActive
-                      ? "bg-white text-slate-950 shadow-sm ring-1 ring-slate-200"
-                      : "text-slate-600 hover:bg-white/80 hover:text-slate-950"
+                      ? "bg-white dark:bg-slate-800 text-slate-950 dark:text-white shadow-sm ring-1 ring-slate-200 dark:ring-slate-700"
+                      : "text-slate-600 dark:text-slate-400 hover:bg-white/80 dark:hover:bg-slate-800/80 hover:text-slate-950 dark:hover:text-white"
                   }`}
                 >
                   <Icon className="h-4 w-4" aria-hidden />
@@ -56,12 +81,21 @@ export function AppShell({ children }: { children: ReactNode }) {
             })}
           </nav>
 
-          <WalletButton />
+          <div className="flex items-center gap-3">
+            <button
+              onClick={toggleTheme}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 shadow-sm transition hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+              aria-label="Toggle dark mode"
+            >
+              {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            </button>
+            <WalletButton />
+          </div>
         </div>
       </header>
       <main className="pb-24 md:pb-0">{children}</main>
       <nav
-        className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-4 gap-2 rounded-xl border border-slate-200 bg-white/92 p-2 shadow-[0_18px_45px_rgba(15,23,42,0.16)] backdrop-blur md:hidden"
+        className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-4 gap-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/92 dark:bg-slate-900/92 p-2 shadow-[0_18px_45px_rgba(15,23,42,0.16)] backdrop-blur md:hidden"
         aria-label="Mobile navigation"
       >
         {navItems.map((item) => {
@@ -73,7 +107,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               key={item.href}
               href={item.href}
               className={`grid h-12 place-items-center rounded-lg text-xs font-semibold ${
-                isActive ? "bg-slate-950 text-white" : "text-slate-600"
+                isActive ? "bg-slate-950 dark:bg-slate-800 text-white" : "text-slate-600 dark:text-slate-400"
               }`}
             >
               <Icon className="h-4 w-4" aria-hidden />
@@ -85,3 +119,4 @@ export function AppShell({ children }: { children: ReactNode }) {
     </div>
   );
 }
+

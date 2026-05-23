@@ -1,13 +1,7 @@
 import { createHash } from "crypto";
+import { buildReflectionPrompt, type ReflectionPromptInput } from "./prompt-utils";
 
-export type ReflectionGenerationInput = {
-  memoryContent: string;
-  modifiers: string[];
-  interpreter: string;
-  context: string;
-  authority: string;
-  priorReflections?: string[];
-};
+export type ReflectionGenerationInput = ReflectionPromptInput;
 
 export type ReflectionGenerationOutput = {
   reflection: string;
@@ -16,24 +10,7 @@ export type ReflectionGenerationOutput = {
   interpreter: string;
 };
 
-export function buildReflectionPrompt(input: ReflectionGenerationInput) {
-  const prior = input.priorReflections?.filter(Boolean).slice(0, 5) ?? [];
-
-  return [
-    "You are generating an AgentReflection for ModifierVault.",
-    "An AgentReflection is a portable semantic interpretation artifact, not a chat reply.",
-    "Read the user-owned memory, apply the modifier stack as interpretive operators, and produce one compact reflection.",
-    "",
-    `Memory: ${input.memoryContent}`,
-    `Modifier stack: ${input.modifiers.join(" -> ") || "remember"}`,
-    `Interpreter: ${input.interpreter}`,
-    `Context: ${input.context}`,
-    `Authority: ${input.authority}`,
-    prior.length ? `Prior reflections:\n${prior.map((item, index) => `${index + 1}. ${item}`).join("\n")}` : "Prior reflections: none",
-    "",
-    "Return 2-4 sentences. Make it specific, reflective, and reusable by future agents.",
-  ].join("\n");
-}
+export { buildReflectionPrompt };
 
 export function hashReflectionPrompt(prompt: string) {
   return createHash("sha256").update(prompt).digest("hex");

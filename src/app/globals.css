@@ -1,8 +1,15 @@
 @import "tailwindcss";
 
+@variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #f7fafc;
   --foreground: #0f172a;
+}
+
+.dark {
+  --background: #090d16;
+  --foreground: #f8fafc;
 }
 
 @theme inline {
@@ -15,6 +22,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
+  transition: background-color 300ms ease, color 300ms ease;
 }
 
 ::selection {
@@ -34,7 +42,15 @@ body {
     transition:
       border-color 160ms ease,
       box-shadow 160ms ease,
-      transform 160ms ease;
+      transform 160ms ease,
+      background-color 160ms ease,
+      color 160ms ease;
+  }
+
+  .dark .input {
+    border-color: #374151;
+    background: #111827;
+    color: #f8fafc;
   }
 
   .input:focus {
