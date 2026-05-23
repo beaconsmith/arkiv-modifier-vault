@@ -1,7 +1,7 @@
 "use client";
 
 import { Brain, KeyRound, Sparkles } from "lucide-react";
-import { type ReactNode, useState, useEffect, useMemo, useRef } from "react";
+import { type ReactNode, useMemo } from "react";
 
 import { DEMO_MODIFIERS } from "@/lib/constants";
 import { getMemoryDisplayContent, getReflectionDisplayText } from "@/lib/schema";
@@ -40,15 +40,9 @@ export function MemoryGraph({
   const nodeWidth = 240;
   const nodeHeight = 110;
 
-  // Initialize node positions
-  const [positions, setPositions] = useState<Record<string, NodePosition>>({});
-  const [activeDragId, setActiveDragId] = useState<string | null>(null);
-  const dragStart = useRef({ x: 0, y: 0 });
-  const nodeStart = useRef({ x: 0, y: 0 });
-
-  // Reset positions if data loads or changes
-  useEffect(() => {
-    const initialPositions: Record<string, NodePosition> = {
+  // Static positions — no dragging (removed drag handlers that caused continuous re-renders)
+  const positions = useMemo<Record<string, NodePosition>>(() => {
+    const pos: Record<string, NodePosition> = {
       memory: { x: 30, y: 150 },
     };
 
@@ -56,10 +50,10 @@ export function MemoryGraph({
       activeStacks.slice(0, 3).forEach((stack, idx) => {
         const key = stack.key ?? `stack-${idx}`;
         const yPos = activeStacks.length === 1 ? 150 : activeStacks.length === 2 ? [90, 210][idx] : [50, 160, 270][idx];
-        initialPositions[key] = { x: 310, y: yPos };
+        pos[key] = { x: 310, y: yPos };
       });
     } else {
-      initialPositions["stack-empty"] = { x: 310, y: 150 };
+      pos["stack-empty"] = { x: 310, y: 150 };
     }
 
     const visibleRefs = reflections.slice(0, 3);
@@ -67,40 +61,14 @@ export function MemoryGraph({
       visibleRefs.forEach((ref, idx) => {
         const key = ref.key ?? `ref-${idx}`;
         const yPos = visibleRefs.length === 1 ? 150 : visibleRefs.length === 2 ? [90, 210][idx] : [50, 160, 270][idx];
-        initialPositions[key] = { x: 590, y: yPos };
+        pos[key] = { x: 590, y: yPos };
       });
     } else {
-      initialPositions["ref-empty"] = { x: 590, y: 150 };
+      pos["ref-empty"] = { x: 590, y: 150 };
     }
 
-    Promise.resolve().then(() => setPositions(initialPositions));
+    return pos;
   }, [activeStacks, reflections]);
-
-  // Drag handlers
-  const handlePointerDown = (id: string, e: React.PointerEvent<HTMLDivElement>) => {
-    setActiveDragId(id);
-    const pos = positions[id] || { x: 0, y: 0 };
-    dragStart.current = { x: e.clientX, y: e.clientY };
-    nodeStart.current = { ...pos };
-    e.currentTarget.setPointerCapture(e.pointerId);
-  };
-
-  const handlePointerMove = (id: string, e: React.PointerEvent<HTMLDivElement>) => {
-    if (activeDragId !== id) return;
-    const dx = e.clientX - dragStart.current.x;
-    const dy = e.clientY - dragStart.current.y;
-    setPositions((prev) => ({
-      ...prev,
-      [id]: {
-        x: Math.max(10, Math.min(800, nodeStart.current.x + dx)),
-        y: Math.max(10, Math.min(380, nodeStart.current.y + dy)),
-      },
-    }));
-  };
-
-  const handlePointerUp = () => {
-    setActiveDragId(null);
-  };
 
   // Helper to draw bezier path between two nodes
   const getBezierPath = (startId: string, endId: string) => {
@@ -123,17 +91,9 @@ export function MemoryGraph({
   return (
     <section
       data-testid="memory-graph"
-      className="relative overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4 shadow-[0_20px_50px_rgba(15,23,42,0.08)] select-none"
+      className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-[0_20px_50px_rgba(15,23,42,0.08)] select-none"
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(255,107,107,0.12),transparent_28%),radial-gradient(circle_at_85%_28%,rgba(6,214,160,0.14),transparent_24%),radial-gradient(circle_at_55%_78%,rgba(67,97,238,0.1),transparent_30%)] pointer-events-none" />
-      
-      <div className="text-xs font-bold text-slate-400 dark:text-slate-500 mb-2 flex justify-between items-center px-1">
-        <span>Click and drag nodes to reorganize view</span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-2 w-2 rounded-full bg-indigo-500 animate-pulse" />
-          Live interactive mode
-        </span>
-      </div>
 
       <div className="relative min-h-[400px] w-full overflow-hidden rounded-lg border border-slate-100 dark:border-slate-800 bg-[#f8fbff]/70 dark:bg-slate-900/40 p-4">
         
@@ -144,22 +104,16 @@ export function MemoryGraph({
           xmlns="http://www.w3.org/2000/svg"
         >
           <style>{`
-            @keyframes flow-glow {
-              to {
-                stroke-dashoffset: -24;
-              }
-            }
             .glow-line {
               stroke: url(#line-gradient-glow);
               stroke-width: 2;
               stroke-linecap: round;
             }
-            .pulse-line {
+            .static-line {
               stroke: #4cc9f0;
-              stroke-width: 2.5;
+              stroke-width: 2;
               stroke-dasharray: 6, 12;
-              animation: flow-glow 1.5s linear infinite;
-              filter: drop-shadow(0 0 3px #4cc9f0);
+              opacity: 0.6;
             }
           `}</style>
           <defs>
@@ -177,7 +131,7 @@ export function MemoryGraph({
                 positions["stack-empty"] && (
                   <g>
                     <path d={getBezierPath("memory", "stack-empty")} className="glow-line opacity-40" />
-                    <path d={getBezierPath("memory", "stack-empty")} className="pulse-line" />
+                    <path d={getBezierPath("memory", "stack-empty")} className="static-line" />
                   </g>
                 )
               ) : (
@@ -186,7 +140,7 @@ export function MemoryGraph({
                   return positions[key] ? (
                     <g key={key}>
                       <path d={getBezierPath("memory", key)} className="glow-line opacity-40" />
-                      <path d={getBezierPath("memory", key)} className="pulse-line" />
+                      <path d={getBezierPath("memory", key)} className="static-line" />
                     </g>
                   ) : null;
                 })
@@ -202,7 +156,7 @@ export function MemoryGraph({
               return positions[sKey] && positions[rKey] ? (
                 <g key={`${sKey}-${rKey}`}>
                   <path d={getBezierPath(sKey, rKey)} className="glow-line opacity-30" />
-                  <path d={getBezierPath(sKey, rKey)} className="pulse-line opacity-80" />
+                  <path d={getBezierPath(sKey, rKey)} className="static-line opacity-80" />
                 </g>
               ) : null;
             });
@@ -215,16 +169,13 @@ export function MemoryGraph({
           {/* Memory Node */}
           {positions["memory"] && (
             <div
-              className="absolute pointer-events-auto"
+              className="absolute"
               style={{
                 left: `${positions["memory"].x}px`,
                 top: `${positions["memory"].y}px`,
                 width: `${nodeWidth}px`,
                 height: `${nodeHeight}px`,
               }}
-              onPointerDown={(e) => handlePointerDown("memory", e)}
-              onPointerMove={(e) => handlePointerMove("memory", e)}
-              onPointerUp={handlePointerUp}
             >
               <GraphNode
                 tone="coral"
@@ -243,16 +194,13 @@ export function MemoryGraph({
               return pos ? (
                 <div
                   key={key}
-                  className="absolute pointer-events-auto"
+                  className="absolute"
                   style={{
                     left: `${pos.x}px`,
                     top: `${pos.y}px`,
                     width: `${nodeWidth}px`,
                     height: `${nodeHeight}px`,
                   }}
-                  onPointerDown={(e) => handlePointerDown(key, e)}
-                  onPointerMove={(e) => handlePointerMove(key, e)}
-                  onPointerUp={handlePointerUp}
                 >
                   <GraphNode
                     tone={index % 2 ? "indigo" : "teal"}
@@ -266,16 +214,13 @@ export function MemoryGraph({
           ) : (
             positions["stack-empty"] && (
               <div
-                className="absolute pointer-events-auto"
+                className="absolute"
                 style={{
                   left: `${positions["stack-empty"].x}px`,
                   top: `${positions["stack-empty"].y}px`,
                   width: `${nodeWidth}px`,
                   height: `${nodeHeight}px`,
                 }}
-                onPointerDown={(e) => handlePointerDown("stack-empty", e)}
-                onPointerMove={(e) => handlePointerMove("stack-empty", e)}
-                onPointerUp={handlePointerUp}
               >
                 <GraphNode
                   tone="teal"
@@ -295,16 +240,13 @@ export function MemoryGraph({
               return pos ? (
                 <div
                   key={key}
-                  className="absolute pointer-events-auto"
+                  className="absolute"
                   style={{
                     left: `${pos.x}px`,
                     top: `${pos.y}px`,
                     width: `${nodeWidth}px`,
                     height: `${nodeHeight}px`,
                   }}
-                  onPointerDown={(e) => handlePointerDown(key, e)}
-                  onPointerMove={(e) => handlePointerMove(key, e)}
-                  onPointerUp={handlePointerUp}
                 >
                   <GraphNode
                     tone="indigo"
@@ -318,16 +260,13 @@ export function MemoryGraph({
           ) : (
             positions["ref-empty"] && (
               <div
-                className="absolute pointer-events-auto"
+                className="absolute"
                 style={{
                   left: `${positions["ref-empty"].x}px`,
                   top: `${positions["ref-empty"].y}px`,
                   width: `${nodeWidth}px`,
                   height: `${nodeHeight}px`,
                 }}
-                onPointerDown={(e) => handlePointerDown("ref-empty", e)}
-                onPointerMove={(e) => handlePointerMove("ref-empty", e)}
-                onPointerUp={handlePointerUp}
               >
                 <GraphNode
                   tone="indigo"
