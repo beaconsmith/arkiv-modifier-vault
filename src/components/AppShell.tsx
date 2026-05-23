@@ -1,9 +1,9 @@
 "use client";
 
-import { BrainCircuit, DatabaseZap, Map, PlusCircle, Search, Sun, Moon } from "lucide-react";
+import { BrainCircuit, DatabaseZap, Map, PlusCircle, Search } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { type ReactNode, useState, useEffect } from "react";
+import { type ReactNode, useEffect } from "react";
 
 import { APP_NAME } from "@/lib/constants";
 
@@ -18,31 +18,10 @@ const navItems = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const [theme, setTheme] = useState<"light" | "dark">("light");
 
   useEffect(() => {
-    const storedTheme = localStorage.getItem("theme") as "light" | "dark" | null;
-    const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    if (storedTheme === "dark" || (!storedTheme && systemPrefersDark)) {
-      Promise.resolve().then(() => setTheme("dark"));
-      document.documentElement.classList.add("dark");
-    } else {
-      Promise.resolve().then(() => setTheme("light"));
-      document.documentElement.classList.remove("dark");
-    }
+    document.documentElement.classList.remove("dark");
   }, []);
-
-  const toggleTheme = () => {
-    if (theme === "light") {
-      setTheme("dark");
-      document.documentElement.classList.add("dark");
-      localStorage.setItem("theme", "dark");
-    } else {
-      setTheme("light");
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("theme", "light");
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
@@ -82,13 +61,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           </nav>
 
           <div className="flex items-center gap-3">
-            <button
-              onClick={toggleTheme}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 shadow-sm transition hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
-              aria-label="Toggle dark mode"
-            >
-              {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-            </button>
             <WalletButton />
           </div>
         </div>
