@@ -87,28 +87,76 @@ export default function Home() {
       </section>
 
       {/* How it works strip */}
-      <section className="border-t border-slate-200/60 pt-10">
-        <h2 className="text-2xl font-black tracking-tight text-slate-950">How it works</h2>
+      <section className="border-t border-slate-200/60 dark:border-slate-800/60 pt-10">
+        <h2 className="text-2xl font-black tracking-tight text-slate-950 dark:text-white">How it works</h2>
         <div className="mt-6 grid gap-6 md:grid-cols-3">
-          <div className="rounded-xl border border-slate-200/80 bg-white p-5">
+          <div className="rounded-xl border border-slate-200/80 dark:border-slate-850 bg-white dark:bg-slate-900/50 p-5">
             <div className="text-xs font-bold uppercase tracking-wider text-indigo-600">Step 1</div>
-            <h3 className="mt-1 font-black text-slate-950">Store a Base Memory</h3>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+            <h3 className="mt-1 font-black text-slate-950 dark:text-white">Store a Base Memory</h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
               Save facts, logs, or system context to the Arkiv blockchain, bound directly to your wallet.
             </p>
           </div>
-          <div className="rounded-xl border border-slate-200/80 bg-white p-5">
+          <div className="rounded-xl border border-slate-200/80 dark:border-slate-850 bg-white dark:bg-slate-900/50 p-5">
             <div className="text-xs font-bold uppercase tracking-wider text-rose-600">Step 2</div>
-            <h3 className="mt-1 font-black text-slate-950">Apply Modifier Stacks</h3>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+            <h3 className="mt-1 font-black text-slate-950 dark:text-white">Apply Modifier Stacks</h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
               Layer transformation filters (like tone shifts or role-routing) to customize how the AI interprets the memory.
             </p>
           </div>
-          <div className="rounded-xl border border-slate-200/80 bg-white p-5">
+          <div className="rounded-xl border border-slate-200/80 dark:border-slate-850 bg-white dark:bg-slate-900/50 p-5">
             <div className="text-xs font-bold uppercase tracking-wider text-cyan-600">Step 3</div>
-            <h3 className="mt-1 font-black text-slate-950">Generate & Save Reflections</h3>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+            <h3 className="mt-1 font-black text-slate-950 dark:text-white">Generate & Save Reflections</h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
               Run the prompt through Groq to see how the modifiers transform the output, then save the reflection to complete the chain.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Plain English Guide */}
+      <section className="border-t border-slate-200/60 dark:border-slate-800/60 pt-10">
+        <h2 className="text-2xl font-black tracking-tight text-slate-950 dark:text-white">
+          The Core Idea (In Plain English)
+        </h2>
+        <p className="mt-2 text-slate-600 dark:text-slate-400 leading-relaxed">
+          Think of this like a <strong>recipe book for how your AI behaves</strong>. Instead of just talking to a chatbot, you control the ingredients and the cooking style:
+        </p>
+        <div className="mt-6 grid gap-6 md:grid-cols-3">
+          <div className="rounded-xl border border-slate-200/60 bg-white p-5 shadow-[0_15px_40px_rgba(15,23,42,0.04)] dark:border-slate-800/80 dark:bg-slate-900/60">
+            <h3 className="font-black text-slate-950 dark:text-white flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
+              1. The Memory (The Fact)
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+              <strong>Example:</strong> &ldquo;My favorite color is green.&rdquo;
+            </p>
+            <p className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-500">
+              This is the raw, pure information. You own it completely on your secure wallet ledger, and can even keep it encrypted.
+            </p>
+          </div>
+          <div className="rounded-xl border border-slate-200/60 bg-white p-5 shadow-[0_15px_40px_rgba(15,23,42,0.04)] dark:border-slate-800/80 dark:bg-slate-900/60">
+            <h3 className="font-black text-slate-950 dark:text-white flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+              2. The Modifier (The Lens)
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+              <strong>Example:</strong> &ldquo;Explain to a 5-year-old&rdquo; + &ldquo;Speak like a pirate&rdquo;
+            </p>
+            <p className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-500">
+              These are filters you layer on. They don&apos;t change the underlying fact, just the lens through which the AI views it.
+            </p>
+          </div>
+          <div className="rounded-xl border border-slate-200/60 bg-white p-5 shadow-[0_15px_40px_rgba(15,23,42,0.04)] dark:border-slate-800/80 dark:bg-slate-900/60">
+            <h3 className="font-black text-slate-950 dark:text-white flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-cyan-500" />
+              3. The Reflection (The Result)
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+              <strong>Example:</strong> &ldquo;Ahoy! Yer favorite shade be that of the green grass!&rdquo;
+            </p>
+            <p className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-500">
+              This is the final response. It is logged securely so you can audit, trace, and inspect the AI&apos;s thoughts at any time.
             </p>
           </div>
         </div>
