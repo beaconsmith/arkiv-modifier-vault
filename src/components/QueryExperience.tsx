@@ -132,12 +132,12 @@ export function QueryExperience() {
     <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 lg:px-8">
       <section className="grid gap-5 lg:grid-cols-[minmax(0,0.8fr)_minmax(360px,0.5fr)]">
         <div>
-          <h1 className="text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
-            Search your AI memory graph
+          <h1 className="text-4xl font-black tracking-tight text-slate-950 dark:text-white sm:text-5xl">
+            Explore Your AI&apos;s Mind Map
           </h1>
-          <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-600">
-            Find stored memories and modifier configurations on the Arkiv ledger. All queries are restricted to the project namespace:{" "}
-            <code className="rounded-md bg-white px-2 py-1 font-mono text-sm text-slate-950 ring-1 ring-slate-200">
+          <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-600 dark:text-slate-400">
+            Easily find your saved memories and how you&apos;ve configured your AI. All your searches stay within your project&apos;s special area:{" "}
+            <code className="rounded-md bg-white dark:bg-slate-950 px-2 py-1 font-mono text-sm text-slate-950 dark:text-slate-200 ring-1 ring-slate-200 dark:ring-slate-800">
               {PROJECT_ATTRIBUTE}
             </code>
             .
@@ -152,8 +152,8 @@ export function QueryExperience() {
           className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-[0_20px_50px_rgba(15,23,42,0.08)]"
         >
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-              <span>Memory Key <span className="text-xs font-normal text-slate-400">(exact blockchain key)</span></span>
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700 dark:text-slate-300">
+              <span>Memory Key <span className="text-xs font-normal text-slate-400">(looking for a specific memory? paste its unique ID here)</span></span>
               <input
                 value={memoryKey}
                 onChange={(event) => setMemoryKey(event.target.value)}
@@ -161,8 +161,8 @@ export function QueryExperience() {
                 className="input font-mono text-sm"
               />
             </label>
-            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-              <span>Modifier <span className="text-xs font-normal text-slate-400">(e.g. route:email)</span></span>
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700 dark:text-slate-300">
+              <span>Modifier <span className="text-xs font-normal text-slate-400">(search by how your AI was told to interpret things)</span></span>
               <input
                 value={modifier}
                 onChange={(event) => setModifier(event.target.value)}
@@ -172,8 +172,8 @@ export function QueryExperience() {
             </label>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-              <span>Category / Domain</span>
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700 dark:text-slate-300">
+              <span>Category</span>
               <input
                 value={domain}
                 onChange={(event) => setDomain(event.target.value)}
@@ -181,8 +181,8 @@ export function QueryExperience() {
                 className="input font-mono text-sm"
               />
             </label>
-            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-              <span>Interpreter <span className="text-xs font-normal text-slate-400">(execution schema)</span></span>
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700 dark:text-slate-300">
+              <span>AI Model / Interpreter <span className="text-xs font-normal text-slate-400">(which AI processed it?)</span></span>
               <input
                 value={interpreter}
                 onChange={(event) => setInterpreter(event.target.value)}
@@ -192,8 +192,8 @@ export function QueryExperience() {
             </label>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-              <span>Storage Mode</span>
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700 dark:text-slate-300">
+              <span>How it&apos;s stored</span>
               <select
                 value={contentMode}
                 onChange={(event) => setContentMode(event.target.value as ContentMode | "")}
@@ -205,8 +205,8 @@ export function QueryExperience() {
                 <option value="encrypted">encrypted (passphrase required)</option>
               </select>
             </label>
-            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-              <span>Visibility</span>
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700 dark:text-slate-300">
+              <span>Who can see it?</span>
               <select
                 value={visibility}
                 onChange={(event) => setVisibility(event.target.value as Visibility | "")}
@@ -220,8 +220,8 @@ export function QueryExperience() {
             </label>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-              <span>Owner Wallet</span>
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700 dark:text-slate-300">
+              <span>Owner Wallet <span className="text-xs font-normal text-slate-400">(whose memory is this?)</span></span>
               <input
                 value={owner}
                 onChange={(event) => setOwner(event.target.value)}
@@ -229,8 +229,8 @@ export function QueryExperience() {
                 className="input font-mono text-sm"
               />
             </label>
-            <label className="grid gap-1.5 text-sm font-bold text-slate-700">
-              <span>Creator Wallet</span>
+            <label className="grid gap-1.5 text-sm font-bold text-slate-700 dark:text-slate-300">
+              <span>Creator Wallet <span className="text-xs font-normal text-slate-400">(who originally saved it?)</span></span>
               <input
                 value={creator}
                 onChange={(event) => setCreator(event.target.value)}
@@ -242,14 +242,14 @@ export function QueryExperience() {
           <button
             type="submit"
             disabled={isLoading}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-black text-white transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:opacity-60"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-slate-950 dark:bg-slate-800 px-4 text-sm font-black text-white transition hover:-translate-y-0.5 hover:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-60"
           >
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
             ) : (
               <Search className="h-4 w-4" aria-hidden />
             )}
-            Search Arkiv Ledger
+            {isLoading ? "Searching…" : "Find It!"}
           </button>
         </form>
       </section>

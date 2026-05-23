@@ -175,12 +175,12 @@ export function CreateExperience() {
     <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[minmax(0,0.96fr)_minmax(420px,1.04fr)] lg:px-8">
       <section className="grid content-start gap-6">
         <div>
-          <h1 className="max-w-3xl text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
+          <h1 className="max-w-3xl text-4xl font-black tracking-tight text-slate-950 dark:text-white sm:text-5xl">
             Save a memory your AI will carry with it
           </h1>
-          <p className="mt-4 max-w-2xl text-lg leading-8 text-slate-600">
-            Every MemoryNode and ModifierStack is written with the project attribute{" "}
-            <code className="rounded-md bg-white px-2 py-1 font-mono text-sm text-slate-950 ring-1 ring-slate-200">
+          <p className="mt-4 max-w-2xl text-lg leading-8 text-slate-600 dark:text-slate-400">
+            Every memory and modifier you save is linked to your project&apos;s unique identifier, like a special tag:{" "}
+            <code className="rounded-md bg-white dark:bg-slate-950 px-2 py-1 font-mono text-sm text-slate-950 dark:text-slate-200 ring-1 ring-slate-200 dark:ring-slate-800">
               {PROJECT_ATTRIBUTE}
             </code>
             .
@@ -192,7 +192,7 @@ export function CreateExperience() {
           className="grid gap-5 rounded-xl border border-slate-200 bg-white p-5 shadow-[0_20px_50px_rgba(15,23,42,0.08)]"
         >
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="What do you want to remember?">
+            <Field label="What's on your mind?">
               <input
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
@@ -204,6 +204,7 @@ export function CreateExperience() {
               <input
                 value={domain}
                 onChange={(event) => setDomain(event.target.value)}
+                placeholder="What kind of memory is this? (e.g. personal thoughts, work notes)"
                 className="input"
                 required
               />
@@ -220,7 +221,7 @@ export function CreateExperience() {
           </Field>
 
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Storage mode">
+            <Field label="How Private Should It Be?">
               <select
                 value={contentMode}
                 onChange={(event) => {
@@ -237,7 +238,7 @@ export function CreateExperience() {
                 <option value="encrypted">Encrypted (only you can read)</option>
               </select>
             </Field>
-            <Field label="Visibility">
+            <Field label="Who Can See This?">
               <select
                 value={visibility}
                 onChange={(event) => setVisibility(event.target.value as Visibility)}
@@ -250,7 +251,7 @@ export function CreateExperience() {
             </Field>
             {contentMode === "encrypted" ? (
               <div className="grid gap-2">
-                <Field label="Passphrase">
+                <Field label="Your Secret Key">
                   <input
                     type="password"
                     value={passphrase}
@@ -260,24 +261,25 @@ export function CreateExperience() {
                     required
                   />
                 </Field>
-                <div className="text-xs font-semibold text-indigo-600 mt-1">
-                  🔒 Your content is encrypted in your browser before being stored. Even Arkiv cannot read it.
+                <div className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 mt-1">
+                  🔒 Your content is encrypted right here in your browser before it ever leaves your computer. This means even Arkiv can&apos;t read your private thoughts!
                 </div>
               </div>
             ) : (
-              <div className="rounded-lg border border-slate-200 bg-[#f8fbff] p-3 text-xs font-semibold leading-5 text-slate-600">
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-[#f8fbff] dark:bg-slate-900/50 p-3 text-xs font-semibold leading-5 text-slate-600 dark:text-slate-400">
                 {contentMode === "metadata-only"
-                  ? "Only preview metadata and query attributes will be written."
-                  : "Raw content will be visible in the public Arkiv payload."}
+                  ? "Only a preview of your memory's details and search tags will be visible."
+                  : "The full content of your memory will be publicly visible on Arkiv."}
               </div>
             )}
           </div>
 
           <div className="grid gap-4 sm:grid-cols-[0.8fr_1.2fr]">
-            <Field label="How should AI interpret this? (modifiers)">
+            <Field label="How should your AI interpret this?">
               <textarea
                 value={modifiers}
                 onChange={(event) => setModifiers(event.target.value)}
+                placeholder="Add modifiers here, like 'be encouraging', 'summarize', 'explain simply'. Use commas to separate them."
                 className="input min-h-24 resize-y font-mono text-sm"
                 required
               />
@@ -291,21 +293,21 @@ export function CreateExperience() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Interpreter">
+            <Field label="Interpreter (which AI model?)">
               <input
                 value={interpreter}
                 onChange={(event) => setInterpreter(event.target.value)}
                 className="input"
               />
             </Field>
-            <Field label="Authority">
+            <Field label="Authority (source of info)">
               <input
                 value={authority}
                 onChange={(event) => setAuthority(event.target.value)}
                 className="input"
               />
             </Field>
-            <Field label="Context">
+            <Field label="Context (background info)">
               <input
                 value={context}
                 onChange={(event) => setContext(event.target.value)}
@@ -318,8 +320,8 @@ export function CreateExperience() {
             <div className="flex items-center gap-3 rounded-lg border border-[#80ed99] bg-[#f0fff4] p-3 text-sm text-[#006d5b]">
               <ShieldCheck className="h-5 w-5 shrink-0 text-[#38b000]" />
               <div>
-                <p className="font-black">Wallet connected ({getActiveProviderName() || "Injected"}): {truncateMiddle(wallet.address, 10, 8)}</p>
-                <p className="text-xs font-semibold text-slate-500 mt-0.5">Ready to sign sequential MemoryNode and ModifierStack transactions on Braga.</p>
+                <p className="font-black">✓ Wallet connected ({getActiveProviderName() || "Injected"}): {truncateMiddle(wallet.address, 10, 8)}</p>
+                <p className="text-xs font-semibold text-slate-500 mt-0.5">You&apos;re all set! Your wallet will sign two small transactions to save your memory and its instructions.</p>
               </div>
             </div>
           ) : (
@@ -327,8 +329,8 @@ export function CreateExperience() {
               <div className="flex items-center gap-3">
                 <Wallet className="h-5 w-5 shrink-0 text-[#f5a623] animate-pulse" />
                 <div>
-                  <p className="font-black">Wallet not connected</p>
-                  <p className="text-xs font-semibold text-slate-500 mt-0.5">Select a wallet to connect and interact on Braga testnet:</p>
+                  <p className="font-black">No wallet connected yet</p>
+                  <p className="text-xs font-semibold text-slate-500 mt-0.5">Connect your digital wallet to save this memory. Pick one below:</p>
                 </div>
               </div>
               
@@ -391,7 +393,7 @@ export function CreateExperience() {
             ) : (
               <PlusCircle className="h-4 w-4" aria-hidden />
             )}
-            {isSubmitting ? "Writing to Arkiv" : "Save to Arkiv Blockchain"}
+            {isSubmitting ? "Saving your memory…" : "Save to Arkiv Blockchain"}
           </button>
         </form>
       </section>
@@ -403,9 +405,9 @@ export function CreateExperience() {
               <LockKeyhole className="h-5 w-5" aria-hidden />
             </span>
             <div>
-              <h2 className="text-xl font-black tracking-tight">Arkiv entity trace</h2>
-              <p className="text-sm leading-6 text-slate-600">
-                Keys, owner, creator, and transaction hashes appear as soon as the wallet confirms.
+              <h2 className="text-xl font-black tracking-tight">Your memory&apos;s record</h2>
+              <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
+                Once your wallet confirms, your memory&apos;s unique ID and transaction receipt appear here.
               </p>
             </div>
           </div>
