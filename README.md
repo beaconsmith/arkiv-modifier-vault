@@ -6,7 +6,9 @@ User-owned AI memory on Arkiv Braga testnet.
 
 ## Theme
 
-**Theme: AI primary, Privacy secondary.** ModifierVault demonstrates portable, user-owned semantic memory for AI agents. A connected wallet writes memories, modifier stacks, and agent reflections to Arkiv; optional client-side encryption keeps sensitive payloads confidential while public attributes remain queryable.
+**Theme: AI primary, Privacy secondary.** 
+
+ModifierVault demonstrates portable, user-owned semantic memory for AI agents. A connected wallet writes memories, modifier stacks, and agent reflections to Arkiv; optional client-side encryption keeps sensitive payloads confidential while public attributes remain queryable.
 
 The privacy model separates semantic structure from semantic payload. Ownership, provenance, lineage, domains, modifiers, and content modes can stay public and searchable; raw memory content can be omitted or encrypted locally before it is written to Braga.
 
