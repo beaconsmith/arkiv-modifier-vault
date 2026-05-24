@@ -1,4 +1,4 @@
-export const PROJECT_ATTRIBUTE = "modifiervault_beaconsmith_ethns_2026";
+export const PROJECT_ATTRIBUTE = "modifiervault_beaconsmith_vault_v3";
 export const SCHEMA_VERSION = "2";
 
 export const APP_NAME = "ModifierVault";

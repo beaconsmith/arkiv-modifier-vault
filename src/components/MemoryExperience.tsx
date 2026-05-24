@@ -116,6 +116,33 @@ export function MemoryExperience() {
   const [selectedStackKey, setSelectedStackKey] = useState("");
   const [replyToKey, setReplyToKey] = useState<string | undefined>();
   const [decryptedMemory, setDecryptedMemory] = useState("");
+  const [decryptedReflections, setDecryptedReflections] = useState<Record<string, string>>({});
+  const [reflectionUnlockPassphrases, setReflectionUnlockPassphrases] = useState<Record<string, string>>({});
+  const [reflectionUnlockErrors, setReflectionUnlockErrors] = useState<Record<string, string>>({});
+
+  const decryptAllReflections = useCallback(
+    async (reflections: ArkivEntityRecord<AgentReflectionPayload>[], passphrase: string) => {
+      if (!passphrase.trim()) return;
+      const nextDecrypted: Record<string, string> = {};
+      for (const ref of reflections) {
+        if (
+          ref.payload.contentMode === "encrypted" &&
+          ref.payload.encryptedReflection
+        ) {
+          try {
+            const decrypted = await decryptString(ref.payload.encryptedReflection, passphrase);
+            nextDecrypted[ref.key] = decrypted;
+          } catch {
+            // maybe different passphrase, ignore
+          }
+        }
+      }
+      if (Object.keys(nextDecrypted).length > 0) {
+        setDecryptedReflections((prev) => ({ ...prev, ...nextDecrypted }));
+      }
+    },
+    []
+  );
   const [decryptPassphrase, setDecryptPassphrase] = useState("");
   const [decryptError, setDecryptError] = useState<string | null>(null);
   const [isDecrypting, setIsDecrypting] = useState(false);
@@ -185,6 +212,7 @@ export function MemoryExperience() {
             setDecryptedMemory(decrypted);
             setEncryptReflection(true);
             setReflectionPassphrase(cached);
+            void decryptAllReflections(graph.reflections, cached);
           })
           .catch(() => {
             // cached key invalid or expired
@@ -194,7 +222,19 @@ export function MemoryExperience() {
           });
       }
     }
-  }, [memoryKey, graph, getPassphrase, decryptedMemory, isDecrypting]);
+  }, [memoryKey, graph, getPassphrase, decryptedMemory, isDecrypting, decryptAllReflections]);
+
+  // Auto-decrypt reflections when graph changes
+  useEffect(() => {
+    if (graph?.reflections) {
+      const activePassphrase = decryptPassphrase || getPassphrase(memoryKey) || "";
+      if (activePassphrase) {
+        Promise.resolve().then(() => {
+          void decryptAllReflections(graph.reflections, activePassphrase);
+        });
+      }
+    }
+  }, [graph?.reflections, decryptPassphrase, memoryKey, getPassphrase, decryptAllReflections]);
 
   useEffect(() => {
     let isMounted = true;
@@ -235,20 +275,26 @@ export function MemoryExperience() {
     };
   }, []);
 
-  const loadGraph = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+  const loadGraph = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      setIsLoading(true);
+      setError(null);
+    }
 
     try {
       const nextGraph = await readMemoryGraph(memoryKey);
       setGraph(nextGraph);
       return nextGraph;
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not load memory map.");
-      setGraph(null);
+      if (!options?.silent) {
+        setError(caught instanceof Error ? caught.message : "Could not load memory map.");
+        setGraph(null);
+      }
       return null;
     } finally {
-      setIsLoading(false);
+      if (!options?.silent) {
+        setIsLoading(false);
+      }
     }
   }, [memoryKey]);
 
@@ -361,6 +407,7 @@ export function MemoryExperience() {
         setReflectionPassphrase(decryptPassphrase);
       }
       setPassphrase(memoryKey, decryptPassphrase);
+      void decryptAllReflections(graph.reflections, decryptPassphrase);
     } catch (err) {
       setDecryptError(err instanceof Error ? err.message : "Could not unlock memory. Please check your secret key.");
       setDecryptedMemory("");
@@ -449,7 +496,7 @@ export function MemoryExperience() {
       const reflectionContentMode: ContentMode = encryptReflection ? "encrypted" : "plaintext";
 
       setTxStep("broadcasting");
-      await createAgentReflection({
+      const { record: createdReflection } = await createAgentReflection({
         memoryKey,
         modifierStackKey: stackKey,
         reflection: reflectionText.trim(),
@@ -464,12 +511,23 @@ export function MemoryExperience() {
         promptHash,
       });
 
+      setGraph((current) => {
+        if (!current) return current;
+        if (current.reflections.some((reflection) => reflection.key === createdReflection.key)) {
+          return current;
+        }
+
+        return {
+          ...current,
+          reflections: [createdReflection, ...current.reflections],
+        };
+      });
       setReflectionSuccess(true);
       setReflectionText("");
       setSelectedPersona("custom");
       setPromptHash(undefined);
       setReplyToKey(undefined);
-      await loadGraph();
+      void loadGraph({ silent: true });
     } catch (err) {
       setReflectionError(err instanceof Error ? err.message : "We couldn't save this thought to the blockchain. Please check your wallet connection.");
     } finally {
@@ -480,7 +538,12 @@ export function MemoryExperience() {
 
   const handleExportGraph = () => {
     if (!graph) return;
-    const dataStr = JSON.stringify(graph, null, 2);
+    const dataStr = JSON.stringify(graph, (key, value) => {
+      if (typeof value === "bigint") {
+        return value.toString();
+      }
+      return value;
+    }, 2);
     const dataBlob = new Blob([dataStr], { type: "application/json" });
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement("a");
@@ -513,6 +576,35 @@ export function MemoryExperience() {
     );
   }, [graph]);
 
+  async function handleUnlockReflection(reflection: ArkivEntityRecord<AgentReflectionPayload>) {
+    const encryptedReflection = reflection.payload.encryptedReflection;
+    if (!encryptedReflection) return;
+
+    const passphrase = reflectionUnlockPassphrases[reflection.key]?.trim();
+    if (!passphrase) {
+      setReflectionUnlockErrors((current) => ({
+        ...current,
+        [reflection.key]: "Enter the secret key for this thought first.",
+      }));
+      return;
+    }
+
+    try {
+      const decrypted = await decryptString(encryptedReflection, passphrase);
+      setDecryptedReflections((current) => ({ ...current, [reflection.key]: decrypted }));
+      setReflectionUnlockErrors((current) => {
+        const next = { ...current };
+        delete next[reflection.key];
+        return next;
+      });
+    } catch {
+      setReflectionUnlockErrors((current) => ({
+        ...current,
+        [reflection.key]: "That secret key did not unlock this thought.",
+      }));
+    }
+  }
+
   const renderReflectionNode = (
     reflection: ArkivEntityRecord<AgentReflectionPayload>,
     depth: number = 0
@@ -534,9 +626,71 @@ export function MemoryExperience() {
           <div className="absolute top-0 right-0 bg-indigo-100 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider rounded-bl">
             {reflection.payload.model}
           </div>
-          <p className="text-sm italic text-slate-700 dark:text-slate-350 mt-2">
-            &ldquo;{getReflectionDisplayText(reflection.payload)}&rdquo;
-          </p>
+          {reflection.payload.contentMode === "encrypted" ? (
+            decryptedReflections[reflection.key] ? (
+              <div className="mt-2 rounded-lg bg-emerald-500/10 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-900/40 p-3">
+                <div className="flex items-center gap-1.5 mb-1.5 text-emerald-700 dark:text-emerald-400 font-bold text-[11px] uppercase tracking-wider">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <span>Private Thought (Unlocked)</span>
+                </div>
+                <p className="text-sm italic text-slate-800 dark:text-slate-200 leading-relaxed">
+                  &ldquo;{decryptedReflections[reflection.key]}&rdquo;
+                </p>
+              </div>
+            ) : (
+              <div className="mt-2 rounded-lg bg-amber-500/5 dark:bg-amber-950/10 border border-amber-200/80 dark:border-amber-900/40 p-3.5">
+                <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400 font-bold text-[11px] uppercase tracking-wider mb-2">
+                  <LockKeyhole className="h-3.5 w-3.5" />
+                  <span>Private Thought (Locked)</span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 leading-relaxed">
+                  This thought was stored privately. Enter its secret key below to unlock it:
+                </p>
+                <div className="flex gap-2 max-w-sm">
+                  <input
+                    type="password"
+                    placeholder="Secret key for this thought"
+                    value={reflectionUnlockPassphrases[reflection.key] ?? ""}
+                    onChange={(event) => {
+                      const nextValue = event.target.value;
+                      setReflectionUnlockPassphrases((current) => ({
+                        ...current,
+                        [reflection.key]: nextValue,
+                      }));
+                      setReflectionUnlockErrors((current) => {
+                        const next = { ...current };
+                        delete next[reflection.key];
+                        return next;
+                      });
+                    }}
+                    className="input py-1 px-2.5 text-xs font-mono"
+                    onKeyDown={async (e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        await handleUnlockReflection(reflection);
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void handleUnlockReflection(reflection)}
+                    className="inline-flex items-center justify-center rounded bg-slate-900 dark:bg-slate-800 px-3 text-xs font-bold text-white dark:text-slate-100 hover:bg-slate-800 dark:hover:bg-slate-700 cursor-pointer"
+                  >
+                    Unlock
+                  </button>
+                </div>
+                {reflectionUnlockErrors[reflection.key] ? (
+                  <p className="mt-2 text-xs font-semibold text-red-600 dark:text-red-400">
+                    {reflectionUnlockErrors[reflection.key]}
+                  </p>
+                ) : null}
+              </div>
+            )
+          ) : (
+            <p className="text-sm italic text-slate-700 dark:text-slate-300 mt-2">
+              &ldquo;{getReflectionDisplayText(reflection.payload)}&rdquo;
+            </p>
+          )}
           <div className="mt-4 grid gap-1 border-t border-slate-100 dark:border-slate-800/80 pt-3 text-xs text-slate-500 dark:text-slate-400">
             <span>AI Model / Interpreter: {reflection.payload.interpreter ?? "legacy"}</span>
             <span>Thought steps (lineage depth): {reflection.payload.lineageDepth ?? 0}</span>
@@ -660,7 +814,7 @@ export function MemoryExperience() {
                     ) : (
                       <div className="border-l-4 border-emerald-500 bg-emerald-50 dark:bg-emerald-950/20 p-4 mb-4 rounded">
                         <div className="flex gap-2">
-                          <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-450 shrink-0" />
+                          <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                           <div>
                             <h4 className="text-sm font-black text-emerald-800 dark:text-emerald-300">Great news! Your memory has been successfully unlocked in your browser.</h4>
                             <p className="mt-1 text-xs font-semibold leading-relaxed text-emerald-700 dark:text-emerald-455">
@@ -692,7 +846,7 @@ export function MemoryExperience() {
                         </button>
                       </div>
                     ) : (
-                      <div className="rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 font-sans text-base leading-relaxed text-slate-800 dark:text-slate-250 ring-2 ring-emerald-500/10">
+                      <div className="rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 font-sans text-base leading-relaxed text-slate-800 dark:text-slate-200 ring-2 ring-emerald-500/10">
                         {decryptedMemory}
                       </div>
                     )}
@@ -701,7 +855,7 @@ export function MemoryExperience() {
                     ) : null}
                   </div>
                 ) : (
-                  <p className="mt-3 text-lg leading-8 text-slate-700 dark:text-slate-350">{getMemoryDisplayContent(graph.memory.payload)}</p>
+                  <p className="mt-3 text-lg leading-8 text-slate-700 dark:text-slate-300">{getMemoryDisplayContent(graph.memory.payload)}</p>
                 )}
                 <dl className="mt-5 grid gap-3 sm:grid-cols-4">
                   <MiniMeta label="Category" value={graph.memory.payload.domain} />
@@ -763,7 +917,7 @@ export function MemoryExperience() {
                                   key={prov.uuid}
                                   type="button"
                                   onClick={() => void handleConnectProvider(prov.uuid)}
-                                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-350 shadow-sm transition hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm transition hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
                                 >
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
                                   <img src={prov.icon} alt="" className="h-4 w-4 rounded object-contain" />
@@ -808,7 +962,7 @@ export function MemoryExperience() {
                     )}
 
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <label className="grid gap-2 text-sm font-bold text-slate-700 dark:text-slate-355">
+                      <label className="grid gap-2 text-sm font-bold text-slate-700 dark:text-slate-300">
                         <span>Choose a lens (Thought Layer)</span>
                         <select
                           value={effectiveSelectedStackKey}
@@ -824,7 +978,7 @@ export function MemoryExperience() {
                         </select>
                       </label>
 
-                      <label className="grid gap-2 text-sm font-bold text-slate-700 dark:text-slate-355">
+                      <label className="grid gap-2 text-sm font-bold text-slate-700 dark:text-slate-300">
                         <span>Choose a thinking style (optional)</span>
                         <select
                           value={selectedPersona}
@@ -857,7 +1011,7 @@ export function MemoryExperience() {
                             !memoryForAi.trim() ||
                             memoryContentMode === "metadata-only"
                           }
-                          className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-slate-950 dark:bg-slate-850 px-4 text-sm font-black text-white dark:text-slate-100 transition hover:-translate-y-0.5 hover:bg-slate-800 dark:hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+                          className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-slate-950 dark:bg-slate-800 px-4 text-sm font-black text-white dark:text-slate-100 transition hover:-translate-y-0.5 hover:bg-slate-800 dark:hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
                         >
                           {isGeneratingReflection ? (
                             <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
@@ -913,7 +1067,7 @@ export function MemoryExperience() {
                         <div className="relative border-l-2 border-slate-300 dark:border-slate-700 pl-4 space-y-4">
                           {/* Original Memory */}
                           <div className="relative">
-                            <div className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-slate-400 dark:bg-slate-650" />
+                            <div className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-slate-400 dark:bg-slate-700" />
                             <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400">What you wrote</h4>
                             <p className="text-sm text-slate-700 dark:text-slate-300 mt-1 max-h-24 overflow-y-auto bg-white dark:bg-slate-900 p-2 rounded border border-slate-200 dark:border-slate-800">
                               {memoryForAi}
@@ -924,8 +1078,8 @@ export function MemoryExperience() {
                           {selectedStack.payload.modifiers.map((mod, idx) => (
                             <div key={mod} className="relative">
                               <div className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-[#4cc9f0]" />
-                              <h4 className="text-xs font-bold text-slate-800 dark:text-slate-250">
-                                Lens modifier {idx + 1}: <code className="text-xs text-rose-600 dark:text-rose-455 bg-rose-50 dark:bg-rose-950/20 px-1 py-0.5 rounded font-mono">{mod}</code>
+                              <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                                Lens modifier {idx + 1}: <code className="text-xs text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/20 px-1 py-0.5 rounded font-mono">{mod}</code>
                               </h4>
                               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                                 {getModifierDescription(mod)}
@@ -936,7 +1090,7 @@ export function MemoryExperience() {
                           {/* Final Reflection */}
                           <div className="relative">
                             <div className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                            <h4 className="text-xs font-bold text-emerald-600 dark:text-emerald-450">The AI&apos;s Interpretation</h4>
+                            <h4 className="text-xs font-bold text-emerald-600 dark:text-emerald-400">The AI&apos;s Interpretation</h4>
                             <p className="text-sm text-slate-700 dark:text-slate-300 mt-1 max-h-32 overflow-y-auto bg-emerald-50/50 dark:bg-emerald-950/10 p-2 rounded border border-emerald-200 dark:border-emerald-900/30">
                               {reflectionText}
                             </p>
@@ -945,7 +1099,7 @@ export function MemoryExperience() {
                       </div>
                     )}
 
-                    <label className="grid gap-2 text-sm font-bold text-slate-700 dark:text-slate-350">
+                    <label className="grid gap-2 text-sm font-bold text-slate-700 dark:text-slate-300">
                       <span>The AI&apos;s Thought</span>
                       <textarea
                         value={reflectionText}
@@ -960,7 +1114,7 @@ export function MemoryExperience() {
                     </label>
 
                     <div className="grid gap-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:grid-cols-[auto_1fr] sm:items-center">
-                      <label className="inline-flex items-center gap-2 text-sm font-black text-slate-700 dark:text-slate-350">
+                      <label className="inline-flex items-center gap-2 text-sm font-black text-slate-700 dark:text-slate-300">
                         <input
                           type="checkbox"
                           checked={encryptReflection}
@@ -1004,7 +1158,7 @@ export function MemoryExperience() {
                           </div>
                           <div className="flex items-center gap-2.5 text-xs font-bold">
                             <span className={`h-4.5 w-4.5 rounded-full flex items-center justify-center text-[10px] ${
-                              txStep === "payload" ? "bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-650" :
+                              txStep === "payload" ? "bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-500" :
                               txStep === "wallet" ? "bg-indigo-600 text-white animate-pulse" : "bg-emerald-500 text-white"
                             }`}>
                               {txStep === "payload" ? "2" : txStep === "wallet" ? "2" : "✓"}
@@ -1015,7 +1169,7 @@ export function MemoryExperience() {
                           </div>
                           <div className="flex items-center gap-2.5 text-xs font-bold">
                             <span className={`h-4.5 w-4.5 rounded-full flex items-center justify-center text-[10px] ${
-                              txStep === "broadcasting" ? "bg-indigo-600 text-white animate-pulse" : "bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-650"
+                              txStep === "broadcasting" ? "bg-indigo-600 text-white animate-pulse" : "bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-500"
                             }`}>
                               3
                             </span>
@@ -1038,7 +1192,13 @@ export function MemoryExperience() {
                         ) : (
                           <Send className="h-4 w-4" aria-hidden />
                         )}
-                        {isSubmittingReflection ? "Getting signature..." : "Save this Memory to the Blockchain"}
+                        {isSubmittingReflection
+                          ? txStep === "broadcasting"
+                            ? "Confirming on Arkiv..."
+                            : txStep === "wallet"
+                              ? "Waiting for signature..."
+                              : "Preparing thought..."
+                          : "Save this Memory to the Blockchain"}
                       </button>
                     ) : (
                       <div className="flex flex-col gap-3 rounded-lg border border-[#ffd166] bg-[#fffdf0] dark:bg-amber-950/10 p-4 text-sm text-[#8a6d00] dark:text-amber-400 mt-2">
@@ -1046,7 +1206,7 @@ export function MemoryExperience() {
                           <Wallet className="h-5 w-5 shrink-0 text-[#f5a623] animate-pulse" />
                           <div>
                             <p className="font-bold">Connect your wallet to proceed</p>
-                            <p className="text-xs text-slate-500 dark:text-slate-450 mt-0.5">You need a digital wallet to save thoughts on the Arkiv blockchain:</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">You need a digital wallet to save thoughts on the Arkiv blockchain:</p>
                           </div>
                         </div>
                         {(() => {
@@ -1068,7 +1228,7 @@ export function MemoryExperience() {
                                   key={prov.uuid}
                                   type="button"
                                   onClick={() => void handleConnectProvider(prov.uuid)}
-                                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-350 shadow-sm transition"
+                                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm transition"
                                 >
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
                                   <img src={prov.icon} alt="" className="h-4 w-4 rounded object-contain" />
@@ -1096,7 +1256,7 @@ export function MemoryExperience() {
                       <ModifierToken key={item} modifier={item} index={itemIndex} />
                     ))}
                   </div>
-                  <p className="mb-4 text-sm leading-6 text-slate-600 dark:text-slate-405">{stack.payload.context}</p>
+                  <p className="mb-4 text-sm leading-6 text-slate-600 dark:text-slate-400">{stack.payload.context}</p>
                   <EntityMeta record={stack} />
                 </div>
               ))}
@@ -1109,7 +1269,7 @@ export function MemoryExperience() {
                 History of AI Thoughts ({graph.reflections.length})
               </h2>
               {graph.reflections.length === 0 ? (
-                <p className="mt-3 text-sm text-slate-500 dark:text-slate-450 italic">No thoughts recorded yet. Use the form above to save the first interpretation!</p>
+                <p className="mt-3 text-sm text-slate-500 dark:text-slate-400 italic">No thoughts recorded yet. Use the form above to save the first interpretation!</p>
               ) : (
                 <div className="mt-4 space-y-4">
                   {rootReflections.map((root) => renderReflectionNode(root, 0))}
@@ -1125,9 +1285,9 @@ export function MemoryExperience() {
 
 function MiniMeta({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-200 dark:border-slate-850 bg-[#f8fbff] dark:bg-slate-900/30 p-3">
+    <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-[#f8fbff] dark:bg-slate-900/30 p-3">
       <dt className="text-xs font-black uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">{label}</dt>
-      <dd className="mt-1 break-words text-sm font-bold text-slate-800 dark:text-slate-350">{value}</dd>
+      <dd className="mt-1 break-words text-sm font-bold text-slate-800 dark:text-slate-300">{value}</dd>
     </div>
   );
 }

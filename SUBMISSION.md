@@ -9,14 +9,14 @@ Use this file as the copy-paste source for the submission form.
 | Summary | A web3-native semantic memory atlas where users write, own, encrypt, read, query, and reinterpret AI memory entities on Arkiv Braga testnet. |
 | GitHub repo | https://github.com/beaconsmith/arkiv-modifier-vault |
 | Demo link | https://modifiervault.vercel.app |
-| Demo video | Optional at submission; record before prize claim |
-| Team | Beaconsmith Team |
+| Demo video | https://www.loom.com/share/1f42e1f0253e46bba84221ad10064ab2 |
+| Team | Nzube Ndiokwelu |
 | GitHub handle | `beaconsmith` |
 | Prize wallet | `0x7c2435c6e148cd2d936d2afcb73ec741ec7effb2` |
 
 ## Technical Checklist
 
-- Unique project attribute: `project = "modifiervault_beaconsmith_ethns_2026"`
+- Unique project attribute: `project = "modifiervault_beaconsmith_vault_v3"`
 - Schema filter: `schemaVersion = "2"`
 - Entity types: `MemoryNode`, `ModifierStack`, `AgentReflection`
 - Relationships: `memoryKey` and `modifierStackKey` attributes

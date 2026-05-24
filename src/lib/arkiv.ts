@@ -415,14 +415,21 @@ if (typeof window !== "undefined") {
 async function getWalletClient() {
   const provider = getProvider();
   const { address } = await connectWallet();
+  const client = createWalletClient({
+    account: address,
+    chain: braga,
+    transport: custom(provider),
+  });
+
+  // Some injected wallet providers keep receipt polling open after Braga confirms.
+  // Sign with the wallet, but poll confirmations through the public Braga RPC.
+  client.waitForTransactionReceipt = ((args) => {
+    return viemPublicClient.waitForTransactionReceipt(args);
+  }) as typeof client.waitForTransactionReceipt;
 
   return {
     address,
-    client: createWalletClient({
-      account: address,
-      chain: braga,
-      transport: custom(provider),
-    }),
+    client,
   };
 }
 

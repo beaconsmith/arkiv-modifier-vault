@@ -2,7 +2,7 @@
 
 User-owned AI memory on Arkiv Braga testnet.
 
-[Live demo](https://modifiervault.vercel.app) | [Arkiv docs](https://docs.arkiv.network/) | [Submission form](https://forms.arkiv.network/ethns-arkiv-challenge)
+[Live demo](https://modifiervault.vercel.app) | [Demo video](https://www.loom.com/share/1f42e1f0253e46bba84221ad10064ab2) | [Arkiv docs](https://docs.arkiv.network/)
 
 ## Theme
 
@@ -21,7 +21,7 @@ ModifierVault stores a small AI memory graph on Arkiv:
 Every entity and every query uses this unique project attribute:
 
 ```txt
-project = "modifiervault_beaconsmith_ethns_2026"
+project = "modifiervault_beaconsmith_vault_v3"
 schemaVersion = "2"
 ```
 
@@ -119,7 +119,7 @@ ARKIV_PRIVATE_KEY=0xYOUR_BRAGA_TESTNET_PRIVATE_KEY
 
 Never expose a private key or AI provider key as `NEXT_PUBLIC_*`.
 
-## Demo Flow
+## Demo
 
 1. Open the [live demo](https://modifiervault.vercel.app).
 2. Go to `/create`.
@@ -129,6 +129,8 @@ Never expose a private key or AI provider key as `NEXT_PUBLIC_*`.
 6. If encrypted, decrypt locally with the passphrase, then generate an AgentReflection through Groq.
 7. Write the AgentReflection to Arkiv and inspect lineage/provenance.
 8. Go to `/query` and search by modifier, domain, interpreter, owner, creator, memory key, visibility, or content mode.
+
+Video walkthrough: https://www.loom.com/share/1f42e1f0253e46bba84221ad10064ab2
 
 ## Verification
 
@@ -157,22 +159,10 @@ Recent verification evidence is tracked in [VERIFICATION.md](VERIFICATION.md).
 | Theme | AI + Privacy |
 | GitHub repo | https://github.com/beaconsmith/arkiv-modifier-vault |
 | Demo link | https://modifiervault.vercel.app |
-| Demo video | Optional for submission; required for prize claim |
-| Team | Beaconsmith Team |
+| Demo video | https://www.loom.com/share/1f42e1f0253e46bba84221ad10064ab2 |
+| Team | Nzube Ndiokwelu |
 | GitHub handle | `beaconsmith` |
 | Prize wallet | `0x7c2435c6e148cd2d936d2afcb73ec741ec7effb2` |
-
-Submit at: https://forms.arkiv.network/ethns-arkiv-challenge
-
-## Demo Video Outline
-
-Suggested 2-3 minute structure for the prize-claim video:
-
-1. Show the theme: user-owned AI memory with optional confidential payloads.
-2. Open `/create`, choose encrypted mode, connect wallet, and create the `Private Thinking Pattern` graph on Braga.
-3. Open the memory route and point out `$owner`, `$creator`, schema v2 attributes, encrypted payload envelope, and Arkiv keys.
-4. Decrypt locally, generate an AgentReflection with Groq, and write it to Arkiv.
-5. Query by modifier, domain, interpreter, owner/creator, and content mode.
 
 ## License
 

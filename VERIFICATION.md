@@ -1,6 +1,6 @@
 # Verification Evidence
 
-Last verified: May 22, 2026.
+Last verified: May 24, 2026.
 
 ## Local
 
@@ -11,6 +11,7 @@ npm run verify
 Result:
 
 - `npm run lint` passed.
+- `npm run test:local` passed.
 - `npm run build` passed.
 - `npm audit --audit-level=moderate` found 0 vulnerabilities.
 - Next.js generated `/`, `/atlas`, `/create`, `/query`, and `/memory/[key]`.
@@ -43,18 +44,15 @@ Runtime logs:
 
 ## Arkiv Braga
 
-Public query used:
+Current project namespace:
 
 ```txt
-project = "modifiervault_beaconsmith_ethns_2026"
+project = "modifiervault_beaconsmith_vault_v3"
 ```
 
-The query returned existing Braga entities for all three app entity types:
+May 24, 2026 check:
 
-| Entity type | Example key | Owner / creator |
-| --- | --- | --- |
-| MemoryNode | `0xdf89d7349f831122d746a3dd95a9edf094ec50cbe0e614b86fdfee9e4d02113f` | `0x53cdd33d878a08b07dc1a9d061d49241bee9b52f` |
-| ModifierStack | `0x36ba584a4b28ee636d14d57b908188bc463f00b388e0c45cf5dca22c7c3a0d6f` | `0x53cdd33d878a08b07dc1a9d061d49241bee9b52f` |
-| AgentReflection | `0xa554ef2ed9c832160cb57a3c0942837b6fd82f2e26cf90498c41ae0c96a140c5` | `0x53cdd33d878a08b07dc1a9d061d49241bee9b52f` |
-
-This verifies that the project attribute is queryable on Braga and that the app's relationship attributes are present in public entity metadata.
+- Read-only public query for `modifiervault_beaconsmith_vault_v3` returned 3 `MemoryNode` entities.
+- The same read-only check returned 0 `ModifierStack` entities and 0 `AgentReflection` entities for the new namespace.
+- `npm run test:braga` was not run because this checkout does not have `ARKIV_PRIVATE_KEY` configured in `.env.local`.
+- Before final submission, run `npm run test:braga` or create one live memory through the app to confirm the new `v3` namespace has linked `ModifierStack` and `AgentReflection` entities.
