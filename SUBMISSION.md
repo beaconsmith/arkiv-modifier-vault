@@ -12,7 +12,7 @@ Use this file as the copy-paste source for the submission form.
 | Demo video | https://www.loom.com/share/1f42e1f0253e46bba84221ad10064ab2 |
 | Team | Nzube Ndiokwelu |
 | GitHub handle | `beaconsmith` |
-| Prize wallet | `0x7c2435c6e148cd2d936d2afcb73ec741ec7effb2` |
+
 
 ## Technical Checklist
 
