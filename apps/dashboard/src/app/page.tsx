@@ -24,13 +24,11 @@ export default function Home() {
     key: previewMemoryKey,
     payload: {
       entityType: "MemoryNode" as const,
-      project: PROJECT_ATTRIBUTE,
       schemaVersion: SCHEMA_VERSION,
       title: DEMO_MEMORY_TITLE,
-      contentPreview: DEMO_MEMORY_CONTENT,
-      contentMode: "encrypted" as const,
+      content: DEMO_MEMORY_CONTENT,
+      contentMode: "plaintext" as const,
       domain: DEMO_MEMORY_DOMAIN,
-      visibility: "private" as const,
       createdAt: new Date("2026-05-22T00:00:00.000Z").toISOString(),
     },
     attributes: [],
@@ -40,7 +38,6 @@ export default function Home() {
     key: "preview-stack-key",
     payload: {
       entityType: "ModifierStack" as const,
-      project: PROJECT_ATTRIBUTE,
       schemaVersion: SCHEMA_VERSION,
       memoryKey: previewMemoryKey,
       modifiers: DEMO_MODIFIERS,

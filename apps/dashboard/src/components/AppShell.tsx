@@ -1,6 +1,6 @@
 "use client";
 
-import { BrainCircuit, DatabaseZap, Map, PlusCircle, Search } from "lucide-react";
+import { BrainCircuit, Code2, DatabaseZap, Map, Microscope, PlusCircle, Search } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useEffect } from "react";
@@ -14,6 +14,8 @@ const navItems = [
   { href: "/create", label: "Store Memory", icon: PlusCircle },
   { href: "/query", label: "Search", icon: Search },
   { href: "/atlas", label: "Graph Atlas", icon: Map },
+  { href: "/sdk", label: "SDK", icon: Code2 },
+  { href: "/research", label: "Research", icon: Microscope },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -67,7 +69,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
       <main className="pb-24 md:pb-0">{children}</main>
       <nav
-        className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-4 gap-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/92 dark:bg-slate-900/92 p-2 shadow-[0_18px_45px_rgba(15,23,42,0.16)] backdrop-blur md:hidden"
+        className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-6 gap-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/92 dark:bg-slate-900/92 p-2 shadow-[0_18px_45px_rgba(15,23,42,0.16)] backdrop-blur md:hidden"
         aria-label="Mobile navigation"
       >
         {navItems.map((item) => {

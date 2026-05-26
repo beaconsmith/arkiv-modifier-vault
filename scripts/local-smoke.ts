@@ -1,7 +1,8 @@
-import { DEMO_AUTHORITY, DEMO_CONTEXT, DEMO_INTERPRETER } from "../src/lib/constants";
-import { encryptString, decryptString } from "../src/lib/crypto";
-import { buildReflectionPrompt } from "../src/lib/reflection";
-import { createMemoryNodePayload } from "../src/lib/schema";
+import { encryptString, decryptString } from "@modifiervault/core";
+import { createMemoryNodePayload } from "@modifiervault/schemas";
+
+import { DEMO_AUTHORITY, DEMO_CONTEXT, DEMO_INTERPRETER } from "../apps/dashboard/src/lib/constants";
+import { buildReflectionPrompt } from "../apps/dashboard/src/lib/reflection";
 
 async function main() {
   const secret = "Memory that should not be stored in plaintext.";
@@ -18,7 +19,6 @@ async function main() {
     contentMode: "metadata-only",
     contentPreview: "Private thinking pattern",
     domain: "personal-cognition",
-    visibility: "private",
   });
 
   if ("content" in metadataOnly || metadataOnly.contentPreview !== "Private thinking pattern") {

@@ -859,7 +859,7 @@ export function MemoryExperience() {
                 )}
                 <dl className="mt-5 grid gap-3 sm:grid-cols-4">
                   <MiniMeta label="Category" value={graph.memory.payload.domain} />
-                  <MiniMeta label="Who can see it?" value={graph.memory.payload.visibility} />
+                  <MiniMeta label="Disclosure" value={graph.memory.payload.contentMode} />
                   <MiniMeta label="How it's stored" value={memoryContentMode} />
                   <MiniMeta label="Saved On" value={graph.memory.payload.createdAt} />
                 </dl>

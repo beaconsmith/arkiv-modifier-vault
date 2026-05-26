@@ -1,170 +1,238 @@
 # ModifierVault
 
-User-owned AI memory on Arkiv Braga testnet.
+ModifierVault is user-owned AI memory infrastructure. It represents memory as a portable semantic graph instead of hidden platform state, so a user can inspect, query, export, encrypt, and reinterpret what an agent remembers.
 
-[Live demo](https://modifiervault.vercel.app) | [Demo video](https://www.loom.com/share/1f42e1f0253e46bba84221ad10064ab2) | [Arkiv docs](https://docs.arkiv.network/)
-
-## Theme
-
-**Theme: AI primary, Privacy secondary.** 
-
-ModifierVault demonstrates portable, user-owned semantic memory for AI agents. A connected wallet writes memories, modifier stacks, and agent reflections to Arkiv; optional client-side encryption keeps sensitive payloads confidential while public attributes remain queryable.
-
-The privacy model separates semantic structure from semantic payload. Ownership, provenance, lineage, domains, modifiers, and content modes can stay public and searchable; raw memory content can be omitted or encrypted locally before it is written to Braga.
-
-## What It Does
-
-ModifierVault stores a small AI memory graph on Arkiv:
-
-- `MemoryNode`: the user-owned memory payload or encrypted payload envelope.
-- `ModifierStack`: queryable instructions that describe how an agent should expand, route, transform, or remember the memory.
-- `AgentReflection`: an AI-generated semantic interpretation artifact linked back to the memory and stack.
-
-Every entity and every query uses this unique project attribute:
+The project namespace is:
 
 ```txt
-project = "modifiervault_beaconsmith_vault_v3"
-schemaVersion = "2"
+PROJECT_ATTRIBUTE = "modifiervault_beaconsmith_ethns_2026"
+schemaVersion = "3"
 ```
 
-New schema v2 entities use `schemaVersion = "2"` on payloads and attributes so the public demo can filter out older hackathon seed data while direct entity-key reads still work.
+## Product Pitch
+
+Most AI memory is opaque: the platform decides what is remembered, how it is reused, and whether the user can move it elsewhere. ModifierVault makes memory explicit. A memory becomes a `MemoryNode`; reuse instructions become `ModifierStack` records; generated interpretations become `AgentReflection` artifacts with lineage hashes. The same base memory can produce different interpretations without rewriting the memory itself.
+
+Demo memory:
+
+```txt
+I avoid decisions until I can model tradeoffs.
+```
+
+Demo modifier stacks:
+
+- A: `["route:strategy", "expand", "remember"]`
+- B: `["route:product", "transform:design"]`
+- C: `["protect", "compress"]`
 
 ## Architecture
 
-![ModifierVault architecture](public/architecture_diagram.png)
-
 ```mermaid
 flowchart LR
-  User["User wallet"] --> UI["Next.js app"]
-  UI --> Wallet["Injected EIP-1193 wallet"]
-  Wallet --> Braga["Arkiv Braga testnet"]
-  Braga --> Memory["MemoryNode entity"]
-  Braga --> Stack["ModifierStack entity"]
-  Braga --> Reflection["AgentReflection entity"]
-  Stack -- "memoryKey attribute" --> Memory
-  Reflection -- "memoryKey + modifierStackKey attributes" --> Memory
-  Reflection -- "previousReflectionKey attribute" --> Reflection
-  UI --> Query["Project-scoped Arkiv queries"]
-  Query --> Braga
+  User["User / wallet owner"] --> Dashboard["apps/dashboard"]
+  Dashboard --> Local["Local mock store"]
+  Dashboard --> Arkiv["Arkiv Braga live mode"]
+  Dashboard --> SDK["@modifiervault/sdk-ts"]
+  SDK --> Core["@modifiervault/core"]
+  Core --> Schemas["@modifiervault/schemas"]
+  Schemas --> Payloads["v3 payload validators"]
+  Schemas --> Attributes["Arkiv attribute builders"]
+  Arkiv --> Memory["MemoryNode"]
+  Arkiv --> Stack["ModifierStack"]
+  Arkiv --> Reflection["AgentReflection"]
+  Local --> Memory
+  Local --> Stack
+  Local --> Reflection
+  Stack -- "memoryKey" --> Memory
+  Reflection -- "memoryKey + modifierStackKey" --> Stack
+  Reflection -- "previousReflectionKey" --> Reflection
 ```
 
-Key Arkiv concepts used:
-
-- Payloads are JSON and use `contentType: "application/json"`.
-- Attributes power indexing and relationships.
-- `schemaVersion`, `contentMode`, `domain`, `interpreter`, and modifier attributes power semantic graph queries.
-- `expiresIn` is configurable through `NEXT_PUBLIC_ARKIV_EXPIRES_IN_SECONDS`.
-- `$owner` is the wallet that can update/delete an entity.
-- `$creator` is immutable attribution for who created the entity.
-
-## Privacy Modes
-
-| Mode | Arkiv payload | Queryable attributes |
-| --- | --- | --- |
-| Public memory | Plain JSON content | Project, schema, type, domain, visibility, contentMode |
-| Metadata-only memory | Preview and metadata only | Same query fields, no raw memory content |
-| Encrypted memory | AES-GCM encrypted envelope | Same query fields, ciphertext only |
-
-Encrypted mode uses the browser Web Crypto API with PBKDF2 -> AES-GCM. The app does not store the passphrase. To generate an AI reflection from encrypted content, the user must decrypt locally and explicitly send the decrypted content to the reflection generator.
-
-## Tech Stack
-
-- Next.js App Router, React, TypeScript
-- Arkiv SDK `@arkiv-network/sdk`
-- Viem wallet transport for browser signing
-- Web Crypto API for local payload encryption
-- Groq Chat Completions for AgentReflection generation
-- Vercel deployment
-- MIT license
-
-## Braga Network
-
-The app targets Arkiv Braga:
+Workspace layout:
 
 ```txt
-Chain ID: 60138453102
-RPC URL: https://braga.hoodi.arkiv.network/rpc
-Explorer: https://explorer.braga.hoodi.arkiv.network
-Entity explorer: https://data.arkiv.network
+apps/dashboard       Next.js dashboard and Arkiv integration
+packages/schemas    TypeScript types, Zod validators, attribute builders
+packages/core       Graph operations, local store, prompt/hash/encryption helpers
+packages/sdk-ts     ModifierVault SDK facade
+docs                Architecture, security, Arkiv, demo, evidence notes
+examples            Runnable SDK examples
+scripts             Local and Braga verification scripts
+```
+
+## Entity Model
+
+`MemoryNode` payload:
+
+```ts
+{
+  entityType: "MemoryNode",
+  schemaVersion: "3",
+  title: string,
+  domain: string,
+  contentMode: "plaintext" | "metadata-only" | "encrypted",
+  content?: string,
+  contentPreview?: string,
+  encryptedContent?: EncryptedPayloadEnvelope,
+  createdAt: string
+}
+```
+
+`ModifierStack` payload:
+
+```ts
+{
+  entityType: "ModifierStack",
+  schemaVersion: "3",
+  memoryKey: string,
+  modifiers: string[],
+  interpreter: string,
+  authority: "user" | "agent" | "shared",
+  context: string,
+  createdAt: string
+}
+```
+
+`AgentReflection` payload:
+
+```ts
+{
+  entityType: "AgentReflection",
+  schemaVersion: "3",
+  memoryKey: string,
+  modifierStackKey: string,
+  previousReflectionKey?: string,
+  lineageDepth: number,
+  model: string,
+  interpreter: string,
+  contentMode: "plaintext" | "metadata-only" | "encrypted",
+  reflection?: string,
+  encryptedReflection?: EncryptedPayloadEnvelope,
+  promptHash: string,
+  outputHash: string,
+  createdAt: string
+}
+```
+
+Arrays live in payload only. Modifier values are also emitted as repeated queryable Arkiv attributes, one per value.
+
+## SDK Usage
+
+```ts
+import { ModifierVault } from "@modifiervault/sdk-ts";
+
+const vault = ModifierVault.local({ owner: "0xowner", creator: "0xcreator" });
+
+const memory = await vault.createMemory({
+  title: "Tradeoff delay",
+  domain: "personal-cognition",
+  contentMode: "plaintext",
+  content: "I avoid decisions until I can model tradeoffs.",
+});
+
+const stack = await vault.attachModifierStack({
+  memoryKey: memory.key,
+  modifiers: ["route:strategy", "expand", "remember"],
+  interpreter: "beaconsmith:v1",
+  authority: "user",
+  context: "Reuse this as a decision strategy.",
+});
+
+await vault.createReflection({
+  memoryKey: memory.key,
+  modifierStackKey: stack.key,
+  lineageDepth: 0,
+  model: "local-reflector",
+  interpreter: "beaconsmith:v1",
+  contentMode: "plaintext",
+  reflection: "Delay preserves optionality until tradeoffs are visible.",
+});
+
+const graph = await vault.exportGraph(memory.key);
+```
+
+Run the example:
+
+```bash
+npm run example:local-sdk
 ```
 
 ## Setup
 
-Prerequisites:
-
-- Node.js 20+
-- npm
-- A browser wallet with Braga testnet GLM for writes
-
-Install and run locally:
-
 ```bash
 npm install
-cp .env.example .env.local
 npm run dev
 ```
 
 Open `http://localhost:3000`.
 
-Environment variables:
+Local mock mode is the default:
 
 ```bash
+NEXT_PUBLIC_MODIFIERVAULT_STORAGE=local
+```
+
+Arkiv live mode:
+
+```bash
+NEXT_PUBLIC_MODIFIERVAULT_STORAGE=arkiv
 NEXT_PUBLIC_ARKIV_RPC_URL=https://braga.hoodi.arkiv.network/rpc
 NEXT_PUBLIC_ARKIV_EXPLORER_URL=https://explorer.braga.hoodi.arkiv.network
 NEXT_PUBLIC_ARKIV_EXPIRES_IN_SECONDS=2592000
-GROQ_API_KEY=gsk_YOUR_GROQ_API_KEY
+GROQ_API_KEY=your_server_side_key
 GROQ_MODEL=llama-3.1-8b-instant
+```
 
-# Optional. Needed only for the Braga CLI smoke test.
+For CLI Braga verification:
+
+```bash
 ARKIV_PRIVATE_KEY=0xYOUR_BRAGA_TESTNET_PRIVATE_KEY
-```
-
-Never expose a private key or AI provider key as `NEXT_PUBLIC_*`.
-
-## Demo
-
-1. Open the [live demo](https://modifiervault.vercel.app).
-2. Go to `/create`.
-3. Connect a browser wallet and switch to Arkiv Braga when prompted.
-4. Create the seeded `Private Thinking Pattern` as public, metadata-only, or encrypted memory.
-5. Open the generated `/memory/[key]` route to inspect owner, creator, payload mode, attributes, and linked entities.
-6. If encrypted, decrypt locally with the passphrase, then generate an AgentReflection through Groq.
-7. Write the AgentReflection to Arkiv and inspect lineage/provenance.
-8. Go to `/query` and search by modifier, domain, interpreter, owner, creator, memory key, visibility, or content mode.
-
-Video walkthrough: https://www.loom.com/share/1f42e1f0253e46bba84221ad10064ab2
-
-## Verification
-
-Local checks:
-
-```bash
-npm run verify
-npm audit --audit-level=moderate
-```
-
-Braga smoke test:
-
-```bash
-# Requires ARKIV_PRIVATE_KEY in .env.local
 npm run test:braga
 ```
 
-The local smoke test verifies encryption/decryption, metadata-only non-leakage, and reflection prompt shape. The Braga smoke test creates a schema v2 `MemoryNode`, linked `ModifierStack`, and linked `AgentReflection`, then verifies project/schema/domain/modifier/interpreter queries.
+Never expose private keys or AI provider keys as `NEXT_PUBLIC_*`.
 
-Recent verification evidence is tracked in [VERIFICATION.md](VERIFICATION.md).
+## Demo Flow
 
-## Submission Info
+1. Run `npm run dev`.
+2. Open `/query` and inspect the seeded local graph.
+3. Open the first `MemoryNode` from the query results.
+4. Confirm `/memory/[key]` reconstructs one memory, three modifier stacks, and linked reflections.
+5. Open `/create`, save a new local memory, and inspect the generated local entity keys.
+6. Open `/sdk` for the SDK usage surface.
+7. Open `/research` for the thesis, demo scenario, and evidence shape.
+8. For live mode, set `NEXT_PUBLIC_MODIFIERVAULT_STORAGE=arkiv`, connect a browser wallet on Braga, and repeat the create/read/query flow.
 
-| Field | Value |
+## Arkiv Compliance Table
+
+| Requirement | Implementation |
 | --- | --- |
-| Theme | AI + Privacy |
-| GitHub repo | https://github.com/beaconsmith/arkiv-modifier-vault |
-| Demo link | https://modifiervault.vercel.app |
-| Demo video | https://www.loom.com/share/1f42e1f0253e46bba84221ad10064ab2 |
-| Team | Nzube Ndiokwelu |
-| GitHub handle | `beaconsmith` |
+| Project filter on every entity/query | `project = "modifiervault_beaconsmith_ethns_2026"` attribute |
+| Schema filter | `schemaVersion = "3"` payload field and attribute |
+| Entity type filter | `entityType` payload field and attribute |
+| Required created timestamp | `createdAt` payload field and attribute |
+| MemoryNode query attributes | `domain`, `contentMode` |
+| ModifierStack query attributes | `memoryKey`, `interpreter`, `authority`, one `modifier__*` attribute per modifier |
+| AgentReflection query attributes | `memoryKey`, `modifierStackKey`, `previousReflectionKey`, `interpreter`, `model`, `lineageDepth` |
+| Arrays in payload only | `modifiers` is payload-only; query attributes are repeated scalar flags |
+| Local mock mode | `apps/dashboard/src/lib/local-vault.ts` stores the same v3 payloads and attributes |
+| Live Arkiv mode | `apps/dashboard/src/lib/arkiv.ts` writes with `@arkiv-network/sdk` |
 
+## Verification
+
+```bash
+npm run verify
+```
+
+This runs lint, schema/core/sdk/dashboard local-mode tests, smoke tests, and the dashboard production build.
+
+More detail:
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Security notes](docs/SECURITY_NOTES.md)
+- [Arkiv notes](docs/ARKIV_NOTES.md)
+- [Demo script](docs/DEMO_SCRIPT.md)
+- [Evidence](docs/EVIDENCE.md)
 
 ## License
 

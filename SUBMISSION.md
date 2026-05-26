@@ -6,23 +6,24 @@ Use this file as the copy-paste source for the submission form.
 | --- | --- |
 | Project | ModifierVault |
 | Theme | AI + Privacy |
-| Summary | A web3-native semantic memory atlas where users write, own, encrypt, read, query, and reinterpret AI memory entities on Arkiv Braga testnet. |
+| Summary | User-owned AI memory infrastructure that models memory as a portable semantic graph of MemoryNodes, ModifierStacks, AgentReflections, and lineage metadata. |
 | GitHub repo | https://github.com/beaconsmith/arkiv-modifier-vault |
 | Demo link | https://modifiervault.vercel.app |
 | Demo video | https://www.loom.com/share/1f42e1f0253e46bba84221ad10064ab2 |
 | Team | Nzube Ndiokwelu |
 | GitHub handle | `beaconsmith` |
 
-
 ## Technical Checklist
 
-- Unique project attribute: `project = "modifiervault_beaconsmith_vault_v3"`
-- Schema filter: `schemaVersion = "2"`
+- Unique project attribute: `project = "modifiervault_beaconsmith_ethns_2026"`
+- Schema filter: `schemaVersion = "3"`
 - Entity types: `MemoryNode`, `ModifierStack`, `AgentReflection`
-- Relationships: `memoryKey` and `modifierStackKey` attributes
+- Relationships: `memoryKey`, `modifierStackKey`, and `previousReflectionKey`
 - Arkiv network: Braga testnet
-- Create/read/query flows: browser wallet plus Arkiv SDK
-- Privacy: browser-side PBKDF2 -> AES-GCM encrypted payload mode
-- AI: Groq-generated AgentReflection artifacts
-- Local verification: `npm run verify`, `npm audit --audit-level=moderate`
+- Local mock mode: default, walletless, same v3 payloads and attributes
+- Arkiv live mode: `NEXT_PUBLIC_MODIFIERVAULT_STORAGE=arkiv`
+- Payload modes: plaintext, metadata-only, encrypted
+- Encryption: browser-side PBKDF2 -> AES-GCM encrypted payload envelopes
+- AI: generated `AgentReflection` artifacts with `promptHash` and `outputHash`
+- Local verification: `npm run verify`
 - Braga verification: `npm run test:braga` with `ARKIV_PRIVATE_KEY`

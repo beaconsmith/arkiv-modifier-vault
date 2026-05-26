@@ -18,7 +18,6 @@ import {
   type ContentMode,
   type MemoryNodePayload,
   type ModifierStackPayload,
-  type Visibility,
 } from "@/lib/schema";
 
 import { EntityMeta } from "./EntityMeta";
@@ -30,7 +29,6 @@ export function QueryExperience() {
   const [domain, setDomain] = useState("");
   const [interpreter, setInterpreter] = useState("");
   const [contentMode, setContentMode] = useState<ContentMode | "">("");
-  const [visibility, setVisibility] = useState<Visibility | "">("");
   const [owner, setOwner] = useState("");
   const [creator, setCreator] = useState("");
   const [memories, setMemories] = useState<ArkivEntityRecord<MemoryNodePayload>[]>([]);
@@ -67,8 +65,7 @@ export function QueryExperience() {
         const filteredMemories = result.memories.filter((memory) => {
           return (
             (!trimmedDomain || memory.payload.domain === trimmedDomain) &&
-            (!contentMode || (memory.payload.contentMode ?? "plaintext") === contentMode) &&
-            (!visibility || memory.payload.visibility === visibility)
+            (!contentMode || memory.payload.contentMode === contentMode)
           );
         });
         setMemories(filteredMemories);
@@ -79,7 +76,6 @@ export function QueryExperience() {
       const projectMemories = await queryMemoryNodes({
         domain: trimmedDomain || undefined,
         contentMode: contentMode || undefined,
-        visibility: visibility || undefined,
         owner: trimmedOwner || undefined,
         creator: trimmedCreator || undefined,
       });
@@ -95,7 +91,7 @@ export function QueryExperience() {
     } finally {
       setIsLoading(false);
     }
-  }, [contentMode, creator, domain, interpreter, memoryKey, modifier, owner, visibility]);
+  }, [contentMode, creator, domain, interpreter, memoryKey, modifier, owner]);
 
   useEffect(() => {
     let isActive = true;
@@ -191,7 +187,7 @@ export function QueryExperience() {
               />
             </label>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3">
             <label className="grid gap-1.5 text-sm font-bold text-slate-700 dark:text-slate-300">
               <span>How it&apos;s stored</span>
               <select
@@ -203,19 +199,6 @@ export function QueryExperience() {
                 <option value="plaintext">plaintext (public)</option>
                 <option value="metadata-only">metadata-only (private content)</option>
                 <option value="encrypted">encrypted (passphrase required)</option>
-              </select>
-            </label>
-            <label className="grid gap-1.5 text-sm font-bold text-slate-700 dark:text-slate-300">
-              <span>Who can see it?</span>
-              <select
-                value={visibility}
-                onChange={(event) => setVisibility(event.target.value as Visibility | "")}
-                className="input cursor-pointer"
-              >
-                <option value="">any</option>
-                <option value="private">private</option>
-                <option value="shared">shared</option>
-                <option value="public">public</option>
               </select>
             </label>
           </div>
@@ -288,8 +271,7 @@ export function QueryExperience() {
                   <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{getMemoryDisplayContent(memory.payload)}</p>
                   <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
                     <span>{memory.payload.domain}</span>
-                    <span>{memory.payload.visibility}</span>
-                    <span>{memory.payload.contentMode ?? "plaintext"}</span>
+                    <span>{memory.payload.contentMode}</span>
                     <span>{formatDate(memory.payload.createdAt)}</span>
                   </div>
                 </div>

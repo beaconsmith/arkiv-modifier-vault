@@ -16,7 +16,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { queryMemoryNodes, readMemoryGraph, arkivExplorerEntityUrl } from "@/lib/arkiv";
-import { PROJECT_ATTRIBUTE } from "@/lib/constants";
+import { PROJECT_ATTRIBUTE, SCHEMA_VERSION } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
 import {
   type ArkivEntityRecord,
@@ -221,12 +221,11 @@ export function AtlasScene() {
                 key: "demo-node-key",
                 payload: {
                   entityType: "MemoryNode",
-                  project: PROJECT_ATTRIBUTE,
+                  schemaVersion: SCHEMA_VERSION,
                   title: "Private Thinking Pattern (Mock)",
                   content: "When confronted with complex logical puzzles, hold contradictory states in view first.",
                   contentMode: "plaintext",
                   domain: "personal-cognition",
-                  visibility: "public",
                   createdAt: new Date().toISOString(),
                 },
               }}
@@ -235,12 +234,12 @@ export function AtlasScene() {
                   key: "demo-stack-key",
                   payload: {
                     entityType: "ModifierStack",
-                    project: PROJECT_ATTRIBUTE,
+                    schemaVersion: SCHEMA_VERSION,
                     memoryKey: "demo-node-key",
                     modifiers: ["remember", "deep-reasoning"],
-                    interpreter: "cognition-atlas:v2",
+                    interpreter: "beaconsmith:v1",
                     context: "Instruction stack",
-                    authority: "wallet-owner",
+                    authority: "user",
                     createdAt: new Date().toISOString(),
                   },
                 },
@@ -250,11 +249,16 @@ export function AtlasScene() {
                   key: "demo-ref-key",
                   payload: {
                     entityType: "AgentReflection",
-                    project: PROJECT_ATTRIBUTE,
+                    schemaVersion: SCHEMA_VERSION,
                     memoryKey: "demo-node-key",
                     modifierStackKey: "demo-stack-key",
+                    lineageDepth: 0,
                     reflection: "Cognitive status: Ambiguity preserved correctly.",
+                    contentMode: "plaintext",
                     model: "groq-llama-3.1",
+                    interpreter: "beaconsmith:v1",
+                    promptHash: "preview-prompt-hash",
+                    outputHash: "preview-output-hash",
                     createdAt: new Date().toISOString(),
                   },
                 },

@@ -17,8 +17,8 @@ import {
   DEMO_MODIFIERS,
   PROJECT_ATTRIBUTE,
   SCHEMA_VERSION,
-} from "../src/lib/constants";
-import { buildReflectionPrompt, hashReflectionPrompt } from "../src/lib/reflection";
+} from "../apps/dashboard/src/lib/constants";
+import { buildReflectionPrompt, hashReflectionPrompt } from "../apps/dashboard/src/lib/reflection";
 import {
   agentReflectionAttributes,
   createAgentReflectionPayload,
@@ -30,7 +30,7 @@ import {
   memoryNodeAttributes,
   modifierAttributeKey,
   modifierStackAttributes,
-} from "../src/lib/schema";
+} from "@modifiervault/schemas";
 
 config({ path: ".env.local" });
 config({ path: ".env" });
@@ -62,7 +62,6 @@ async function main() {
     content: DEMO_MEMORY_CONTENT,
     contentMode: "plaintext",
     domain: DEMO_MEMORY_DOMAIN,
-    visibility: "private",
   });
 
   const memoryAttributes = memoryNodeAttributes(payload);
@@ -121,6 +120,9 @@ async function main() {
     context: DEMO_CONTEXT,
     authority: DEMO_AUTHORITY,
     promptHash: hashReflectionPrompt(reflectionPrompt),
+    outputHash: hashReflectionPrompt(
+      "The user's memory prefers contradiction mapping before commitment, so future agents should preserve ambiguity until a stable pattern appears.",
+    ),
     lineageDepth: 0,
   });
 
@@ -168,7 +170,7 @@ async function main() {
       eq("schemaVersion", SCHEMA_VERSION),
       eq("entityType", "ModifierStack"),
       eq("interpreter", DEMO_INTERPRETER),
-      eq(modifierAttributeKey("route:private-reasoning"), "true"),
+      eq(modifierAttributeKey(DEMO_MODIFIERS[0]), "true"),
     ])
     .withPayload()
     .withAttributes()
@@ -221,7 +223,7 @@ async function main() {
         modifierStackTxHash,
         reflectionKey,
         reflectionTxHash,
-        modifierQuery: "route:private-reasoning",
+        modifierQuery: DEMO_MODIFIERS[0],
         queriedMemories: memoryQueryResult.entities.length,
         queriedModifierStacks: modifierQueryResult.entities.length,
         queriedReflections: reflectionQueryResult.entities.length,

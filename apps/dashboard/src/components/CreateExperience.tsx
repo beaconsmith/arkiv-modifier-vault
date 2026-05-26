@@ -41,6 +41,7 @@ import {
   DEMO_MEMORY_DOMAIN,
   DEMO_MEMORY_TITLE,
   DEMO_MODIFIERS,
+  MODIFIERVAULT_STORAGE_MODE,
   PROJECT_ATTRIBUTE,
 } from "@/lib/constants";
 import { encryptString } from "@/lib/crypto";
@@ -104,6 +105,7 @@ export function CreateExperience() {
 
   // Keep compatibility with imports and standard form logic
   const parsedModifiers = activeModifiers;
+  const isLocalMode = MODIFIERVAULT_STORAGE_MODE === "local";
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -182,7 +184,9 @@ export function CreateExperience() {
         contentPreview:
           contentMode === "plaintext"
             ? content
-            : `${content.slice(0, 96)}${content.length > 96 ? "..." : ""}`,
+            : contentMode === "metadata-only"
+              ? "Metadata-only memory. Raw content was not stored."
+              : "Encrypted memory. Decrypt locally to view.",
       });
 
       setResult({
@@ -284,7 +288,7 @@ export function CreateExperience() {
             Save a memory your AI will carry
           </h1>
           <p className="mt-4 text-base text-slate-600">
-            Every memory payload and modifier stack is registered securely on Braga testnet under your project namespace:
+            Every memory payload and modifier stack is saved under your project namespace:
             <code className="ml-1.5 rounded bg-slate-100 px-2 py-0.5 font-mono text-xs font-semibold text-slate-800 border border-slate-200">
               {PROJECT_ATTRIBUTE}
             </code>
@@ -574,7 +578,19 @@ export function CreateExperience() {
           </div>
 
           {/* WALLET AND SIGNING CONTROLS */}
-          {wallet ? (
+          {isLocalMode ? (
+            <div className="flex items-center gap-3.5 rounded-xl border border-emerald-200 bg-emerald-50/30 p-4 text-sm text-emerald-800 animate-fade-in">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-emerald-100 text-emerald-600">
+                <ShieldCheck className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="font-extrabold text-emerald-950">Local Mock Mode Active</p>
+                <p className="text-xs font-semibold text-emerald-700 mt-0.5">
+                  Writes use the same v3 payloads and attributes, stored in this browser instead of Arkiv.
+                </p>
+              </div>
+            </div>
+          ) : wallet ? (
             <div className="flex items-center gap-3.5 rounded-xl border border-emerald-200 bg-emerald-50/30 p-4 text-sm text-emerald-800 animate-fade-in">
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-emerald-100 text-emerald-600">
                 <ShieldCheck className="h-5 w-5" />
@@ -670,7 +686,13 @@ export function CreateExperience() {
             ) : (
               <PlusCircle className="h-4.5 w-4.5" aria-hidden />
             )}
-            {isSubmitting ? "Writing Memory graph to Braga..." : "Write to Braga Ledger"}
+            {isSubmitting
+              ? isLocalMode
+                ? "Saving local Memory graph..."
+                : "Writing Memory graph to Braga..."
+              : isLocalMode
+                ? "Save Local Memory Graph"
+                : "Write to Braga Ledger"}
           </button>
         </form>
       </section>
@@ -710,7 +732,9 @@ export function CreateExperience() {
             {result?.modifierStackKey ? (
               <div className="flex flex-wrap items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/25 p-3.5 text-xs font-bold text-emerald-800 animate-fade-in mt-1.5">
                 <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" aria-hidden />
-                <span>Memory and instructions successfully committed.</span>
+                <span>
+                  Memory and instructions successfully {isLocalMode ? "saved in local mock mode." : "committed."}
+                </span>
                 <Link
                   href={`/memory/${encodeURIComponent(result.memoryKey ?? "")}`}
                   className="inline-flex items-center gap-1 rounded bg-slate-900 hover:bg-slate-800 px-3 py-1.5 text-xs font-bold text-white transition ml-auto shadow-sm decoration-0"

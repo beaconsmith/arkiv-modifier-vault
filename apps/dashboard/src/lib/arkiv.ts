@@ -25,6 +25,7 @@ import {
   ARKIV_GAS_FEE_MULTIPLIER,
   ARKIV_MIN_MAX_FEE_PER_GAS_WEI,
   DEFAULT_ENTITY_TTL_SECONDS,
+  MODIFIERVAULT_STORAGE_MODE,
   PROJECT_ATTRIBUTE,
   SCHEMA_VERSION,
 } from "./constants";
@@ -51,6 +52,23 @@ import {
   type ModifierVaultPayload,
   type Visibility,
 } from "./schema";
+import { hashString } from "./crypto";
+import {
+  localCreateAgentReflection,
+  localCreateMemoryNode,
+  localCreateModifierStack,
+  localQueryAgentReflections,
+  localQueryMemoryNodes,
+  localQueryMemoryNodesByModifier,
+  localQueryModifierStacks,
+  localReadEntityByKey,
+  localReadMemoryGraph,
+  localReadMemoryNode,
+  resetLocalVaultForTests,
+  seedLocalDemoGraph,
+} from "./local-vault";
+
+export { resetLocalVaultForTests, seedLocalDemoGraph };
 
 type Eip1193Provider = {
   request(args: { method: string; params?: unknown[] | Record<string, unknown> }): Promise<unknown>;
@@ -93,6 +111,10 @@ const viemPublicClient = createViemPublicClient({
   chain: braga,
   transport: http(ARKIV_BRAGA_RPC_URL),
 });
+
+function isLocalMode() {
+  return MODIFIERVAULT_STORAGE_MODE === "local";
+}
 
 const discoveredProviders: DiscoveredProvider[] = [];
 const providerListeners = new Set<(providers: DiscoveredProvider[]) => void>();
@@ -493,6 +515,10 @@ function entityToRecord<T extends ModifierVaultPayload>(entity: Entity): ArkivEn
 }
 
 export async function createMemoryNode(input: CreateMemoryInput) {
+  if (isLocalMode()) {
+    return localCreateMemoryNode(input);
+  }
+
   const payload = createMemoryNodePayload(input);
   const { address, client } = await getWalletClient();
   const txParams = await getSafeCreateTxParams(address);
@@ -516,6 +542,10 @@ export async function createMemoryNode(input: CreateMemoryInput) {
 }
 
 export async function createModifierStack(input: CreateModifierStackInput) {
+  if (isLocalMode()) {
+    return localCreateModifierStack(input);
+  }
+
   const payload = createModifierStackPayload(input);
   const { address, client } = await getWalletClient();
   const txParams = await getSafeCreateTxParams(address);
@@ -539,7 +569,28 @@ export async function createModifierStack(input: CreateModifierStackInput) {
 }
 
 export async function createAgentReflection(input: CreateAgentReflectionInput) {
-  const payload = createAgentReflectionPayload(input);
+  if (isLocalMode()) {
+    return localCreateAgentReflection(input);
+  }
+
+  const reflectionForHash =
+    input.contentMode === "encrypted" && input.encryptedReflection
+      ? JSON.stringify(input.encryptedReflection)
+      : input.reflection ?? "";
+  const promptSeed = [
+    input.memoryKey,
+    input.modifierStackKey,
+    input.previousReflectionKey ?? "",
+    input.lineageDepth ?? 0,
+    input.model,
+    input.interpreter ?? "",
+    reflectionForHash,
+  ].join("\n");
+  const payload = createAgentReflectionPayload({
+    ...input,
+    promptHash: input.promptHash ?? (await hashString(promptSeed)),
+    outputHash: input.outputHash ?? (await hashString(reflectionForHash)),
+  });
   const { address, client } = await getWalletClient();
   const txParams = await getSafeCreateTxParams(address);
 
@@ -562,12 +613,20 @@ export async function createAgentReflection(input: CreateAgentReflectionInput) {
 }
 
 export async function readEntityByKey<T extends ModifierVaultPayload>(key: string) {
+  if (isLocalMode()) {
+    return localReadEntityByKey<T>(key);
+  }
+
   assertEntityKey(key);
   const entity = await publicClient.getEntity(key);
   return entityToRecord<T>(entity);
 }
 
 export async function readMemoryNode(key: string) {
+  if (isLocalMode()) {
+    return localReadMemoryNode(key);
+  }
+
   const record = await readEntityByKey<MemoryNodePayload>(key);
 
   if (!isMemoryNodePayload(record.payload)) {
@@ -606,6 +665,10 @@ export type QueryMemoryNodeOptions = {
 
 export async function queryMemoryNodes(options: QueryMemoryNodeOptions | number = {}) {
   const normalizedOptions = typeof options === "number" ? { limit: options } : options;
+  if (isLocalMode()) {
+    return localQueryMemoryNodes(normalizedOptions);
+  }
+
   const predicates = [
     eq("project", PROJECT_ATTRIBUTE),
     eq("entityType", "MemoryNode"),
@@ -621,10 +684,6 @@ export async function queryMemoryNodes(options: QueryMemoryNodeOptions | number 
 
   if (normalizedOptions.contentMode) {
     predicates.push(eq("contentMode", normalizedOptions.contentMode));
-  }
-
-  if (normalizedOptions.visibility) {
-    predicates.push(eq("visibility", normalizedOptions.visibility));
   }
 
   const query = applyOwnerFilters(
@@ -656,6 +715,10 @@ export type QueryModifierStackOptions = {
 };
 
 export async function queryModifierStacks(options: QueryModifierStackOptions = {}) {
+  if (isLocalMode()) {
+    return localQueryModifierStacks(options);
+  }
+
   const predicates = [
     eq("project", PROJECT_ATTRIBUTE),
     eq("entityType", "ModifierStack"),
@@ -706,6 +769,10 @@ export type QueryAgentReflectionOptions = {
 };
 
 export async function queryAgentReflections(options: QueryAgentReflectionOptions = {}) {
+  if (isLocalMode()) {
+    return localQueryAgentReflections(options);
+  }
+
   const predicates = [
     eq("project", PROJECT_ATTRIBUTE),
     eq("entityType", "AgentReflection"),
@@ -751,6 +818,10 @@ export async function queryMemoryNodesByModifier(
   limit = 25,
   options: Omit<QueryModifierStackOptions, "modifier" | "limit"> = {},
 ) {
+  if (isLocalMode()) {
+    return localQueryMemoryNodesByModifier(modifier, limit, options);
+  }
+
   const normalized = normalizeModifier(modifier);
   const stacks = await queryModifierStacks({ ...options, modifier: normalized, limit });
   const keys = Array.from(new Set(stacks.map((stack) => stack.payload.memoryKey)));
@@ -765,6 +836,10 @@ export async function queryMemoryNodesByModifier(
 }
 
 export async function readMemoryGraph(memoryKey: string) {
+  if (isLocalMode()) {
+    return localReadMemoryGraph(memoryKey);
+  }
+
   const memory = await readMemoryNode(memoryKey);
   const includeLegacy = memory.payload.schemaVersion !== SCHEMA_VERSION;
   const [stacks, reflections] = await Promise.all([

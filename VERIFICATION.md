@@ -1,6 +1,6 @@
 # Verification Evidence
 
-Last verified: May 24, 2026.
+Last verified locally during this rebuild: May 26, 2026.
 
 ## Local
 
@@ -13,46 +13,53 @@ Result:
 - `npm run lint` passed.
 - `npm run test:local` passed.
 - `npm run build` passed.
-- `npm audit --audit-level=moderate` found 0 vulnerabilities.
-- Next.js generated `/`, `/atlas`, `/create`, `/query`, and `/memory/[key]`.
+- Next.js generated `/`, `/create`, `/query`, `/memory/[key]`, `/sdk`, and `/research`.
 
-## Vercel
+`test:local` includes:
 
-Production alias:
+- schema strictness and disclosure tests
+- core graph tests
+- SDK tests
+- dashboard local-mode graph tests
+- encryption/decryption smoke test
 
-```txt
-https://modifiervault.vercel.app
-```
+## Browser
 
-Latest inspected production deployment:
+Local browser verification loaded:
 
-```txt
-dpl_GzW9PvHKcoCvFxFtZLcxpCFN9rtr
-https://modifiervault-iqk176n3k-beaconsmiths-projects.vercel.app
-status: READY
-```
+- `/`
+- `/sdk`
+- `/research`
+- `/query`
+- `/memory/local-memorynode-0001`
 
-HTTP route checks:
+Observed local graph contents:
 
-- `/` returned `200 OK`.
-- `/create` returned `200 OK`.
-- `/query` returned `200 OK`.
-
-Runtime logs:
-
-- `vercel logs --since 30m --level error` returned no logs.
+- base memory: `I avoid decisions until I can model tradeoffs.`
+- modifier stack A: `route:strategy`, `expand`, `remember`
+- modifier stack B: `route:product`, `transform:design`
+- modifier stack C: `protect`, `compress`
+- owner/creator proof metadata
 
 ## Arkiv Braga
 
 Current project namespace:
 
 ```txt
-project = "modifiervault_beaconsmith_vault_v3"
+project = "modifiervault_beaconsmith_ethns_2026"
+schemaVersion = "3"
 ```
 
-May 24, 2026 check:
+Live verification command:
 
-- Read-only public query for `modifiervault_beaconsmith_vault_v3` returned 3 `MemoryNode` entities.
-- The same read-only check returned 0 `ModifierStack` entities and 0 `AgentReflection` entities for the new namespace.
-- `npm run test:braga` was not run because this checkout does not have `ARKIV_PRIVATE_KEY` configured in `.env.local`.
-- Before final submission, run `npm run test:braga` or create one live memory through the app to confirm the new `v3` namespace has linked `ModifierStack` and `AgentReflection` entities.
+```bash
+npm run test:braga
+```
+
+`test:braga` requires `ARKIV_PRIVATE_KEY` in `.env.local`. It writes and reads:
+
+- one `MemoryNode`
+- one linked `ModifierStack`
+- one linked `AgentReflection`
+
+Then it verifies project/schema/domain/modifier/interpreter queries.

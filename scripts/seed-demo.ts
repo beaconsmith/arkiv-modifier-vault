@@ -9,8 +9,8 @@ import {
   DEFAULT_ENTITY_TTL_SECONDS,
   DEMO_AUTHORITY,
   DEMO_INTERPRETER,
-} from "../src/lib/constants";
-import { buildReflectionPrompt, hashReflectionPrompt } from "../src/lib/reflection";
+} from "../apps/dashboard/src/lib/constants";
+import { buildReflectionPrompt, hashReflectionPrompt } from "../apps/dashboard/src/lib/reflection";
 import {
   agentReflectionAttributes,
   createAgentReflectionPayload,
@@ -18,7 +18,7 @@ import {
   createMemoryNodePayload,
   memoryNodeAttributes,
   modifierStackAttributes,
-} from "../src/lib/schema";
+} from "@modifiervault/schemas";
 
 config({ path: ".env.local" });
 config({ path: ".env" });
@@ -48,7 +48,6 @@ async function main() {
     content: "When confronted with complex logical puzzles or multi-layered inputs, hold contradictory interpretations in view without committing. Monitor external events, wait for a natural pattern to stabilize, and only then construct the final decision action.",
     contentMode: "plaintext",
     domain: "cognition-dynamics",
-    visibility: "private",
   });
   const { entityKey: memory1Key, txHash: memory1Tx } = await walletClient.createEntity({
     payload: jsonToPayload(memory1Payload),
@@ -93,6 +92,7 @@ async function main() {
     context: stack1Payload.context,
     authority: DEMO_AUTHORITY,
     promptHash: hashReflectionPrompt(prompt1),
+    outputHash: hashReflectionPrompt("Model evaluation: Holding competing logic states avoids early local minima optimization, reducing overall agent error rate by 14%."),
     lineageDepth: 0,
   });
   const { entityKey: reflection1Key, txHash: reflection1Tx } = await walletClient.createEntity({
@@ -121,6 +121,7 @@ async function main() {
     context: stack1Payload.context,
     authority: DEMO_AUTHORITY,
     promptHash: hashReflectionPrompt(prompt2),
+    outputHash: hashReflectionPrompt("Optimized decision workflow: Maintain contradiction state for exactly 3 feedback cycles. Group reasoning steps in secure thinking tags."),
     lineageDepth: 1,
     previousReflectionKey: reflection1Key,
   });
@@ -140,7 +141,6 @@ async function main() {
     content: "Verify that all cryptographic wallets submit transactions under 500ms latency. Log any transaction hash that takes more than 1.2s to broadcast or clear on Braga.",
     contentMode: "plaintext",
     domain: "security-vault",
-    visibility: "private",
   });
   const { entityKey: memory2Key, txHash: memory2Tx } = await walletClient.createEntity({
     payload: jsonToPayload(memory2Payload),
@@ -185,6 +185,7 @@ async function main() {
     context: stack2Payload.context,
     authority: DEMO_AUTHORITY,
     promptHash: hashReflectionPrompt(prompt3),
+    outputHash: hashReflectionPrompt("Security audit compliance report: Broadcast latencies checked. 99.8% of Braga vault write actions completed inside the 500ms window."),
     lineageDepth: 0,
   });
   const { entityKey: reflection3Key, txHash: reflection3Tx } = await walletClient.createEntity({
@@ -203,7 +204,6 @@ async function main() {
     content: "When acting on behalf of a wallet, an agent must only execute read calls unless the transaction value is less than 0.05 ETH on Braga. Multi-step actions must be signed sequentially by the owner wallet.",
     contentMode: "plaintext",
     domain: "agent-architecture",
-    visibility: "private",
   });
   const { entityKey: memory3Key, txHash: memory3Tx } = await walletClient.createEntity({
     payload: jsonToPayload(memory3Payload),
@@ -248,6 +248,7 @@ async function main() {
     context: stack3Payload.context,
     authority: DEMO_AUTHORITY,
     promptHash: hashReflectionPrompt(prompt4),
+    outputHash: hashReflectionPrompt("Architectural confirmation: Dialoguing boundary rules has been parsed. The agent will strictly refuse higher value executions without explicit wallet signing signatures."),
     lineageDepth: 0,
   });
   const { entityKey: reflection4Key, txHash: reflection4Tx } = await walletClient.createEntity({

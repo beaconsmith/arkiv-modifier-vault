@@ -1,15 +1,20 @@
 {
-  "name": "modifiervault",
+  "name": "modifiervault-monorepo",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint",
-    "test:local": "tsx scripts/local-smoke.ts",
+    "dev": "npm --workspace @modifiervault/dashboard run dev",
+    "build": "npm --workspace @modifiervault/dashboard run build",
+    "start": "npm --workspace @modifiervault/dashboard run start",
+    "lint": "npm --workspace @modifiervault/dashboard run lint",
+    "test:local": "tsx packages/schemas/test/schema.test.ts && tsx packages/core/test/core.test.ts && tsx packages/sdk-ts/test/sdk.test.ts && tsx apps/dashboard/test/local-mode.test.ts && tsx scripts/local-smoke.ts",
     "test:braga": "tsx scripts/braga-test.ts",
     "seed:demo": "tsx scripts/seed-demo.ts",
+    "example:local-sdk": "tsx examples/local-sdk.ts",
     "verify": "npm run lint && npm run test:local && npm run build"
   },
   "dependencies": {
@@ -30,7 +35,8 @@
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
     "tsx": "^4.22.3",
-    "typescript": "^5"
+    "typescript": "^5",
+    "zod": "^4.1.13"
   },
   "overrides": {
     "next": {

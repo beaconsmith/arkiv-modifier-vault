@@ -1,5 +1,5 @@
-export const PROJECT_ATTRIBUTE = "modifiervault_beaconsmith_vault_v3";
-export const SCHEMA_VERSION = "2";
+export const PROJECT_ATTRIBUTE = "modifiervault_beaconsmith_ethns_2026";
+export const SCHEMA_VERSION = "3";
 
 export const APP_NAME = "ModifierVault";
 export const APP_TAGLINE = "Own the way your AI remembers.";
@@ -16,6 +16,9 @@ export const DEFAULT_ENTITY_TTL_SECONDS =
   Number(process.env.NEXT_PUBLIC_ARKIV_EXPIRES_IN_SECONDS) ||
   60 * 60 * 24 * 30;
 
+export const MODIFIERVAULT_STORAGE_MODE =
+  process.env.NEXT_PUBLIC_MODIFIERVAULT_STORAGE === "arkiv" ? "arkiv" : "local";
+
 export const ARKIV_CREATE_GAS_LIMIT =
   BigInt(process.env.NEXT_PUBLIC_ARKIV_CREATE_GAS_LIMIT ?? "650000");
 export const ARKIV_MIN_MAX_FEE_PER_GAS_WEI =
@@ -24,18 +27,17 @@ export const ARKIV_GAS_FEE_MULTIPLIER =
   BigInt(process.env.NEXT_PUBLIC_ARKIV_GAS_FEE_MULTIPLIER ?? "3");
 
 export const DEMO_MEMORY_CONTENT =
-  "When I solve hard problems, I map contradictions first, then let a pattern emerge before choosing a direction.";
+  "I avoid decisions until I can model tradeoffs.";
 
 export const DEMO_MODIFIERS = [
-  "expand:contradictions",
-  "route:private-reasoning",
-  "transform:pattern-map",
+  "route:strategy",
+  "expand",
   "remember",
 ];
 
-export const DEMO_MEMORY_TITLE = "Private Thinking Pattern";
+export const DEMO_MEMORY_TITLE = "Tradeoff Modeling Pattern";
 export const DEMO_MEMORY_DOMAIN = "personal-cognition";
-export const DEMO_INTERPRETER = "cognition-atlas:v2";
+export const DEMO_INTERPRETER = "beaconsmith:v1";
 export const DEMO_CONTEXT =
-  "Private reasoning pattern for future agents that need to understand how this user reaches decisions.";
-export const DEMO_AUTHORITY = "wallet-owner";
+  "Same base memory, reusable through explicit ModifierStacks without rewriting the memory.";
+export const DEMO_AUTHORITY = "user";

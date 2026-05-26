@@ -49,6 +49,18 @@ function toArrayBuffer(bytes: Uint8Array) {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
+function bytesToHex(bytes: Uint8Array) {
+  return Array.from(bytes)
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+export async function hashString(value: string) {
+  const cryptoImpl = getCrypto();
+  const digest = await cryptoImpl.subtle.digest("SHA-256", toArrayBuffer(new TextEncoder().encode(value)));
+  return bytesToHex(new Uint8Array(digest));
+}
+
 async function deriveAesKey(passphrase: string, salt: Uint8Array) {
   if (!passphrase.trim()) {
     throw new Error("A passphrase is required for encrypted payloads.");
