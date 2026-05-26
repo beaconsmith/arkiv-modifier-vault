@@ -101,7 +101,7 @@ function getModifierDescription(modifier: string): string {
 
 export function MemoryExperience() {
   const params = useParams<{ key: string }>();
-  const memoryKey = useMemo(() => decodeURIComponent(params.key ?? ""), [params.key]);
+  const memoryKey = useMemo(() => decodeURIComponent(params?.key ?? ""), [params?.key]);
   const [graph, setGraph] = useState<GraphState | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
