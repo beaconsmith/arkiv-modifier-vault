@@ -10,3 +10,4 @@ scratch/
 .idea/
 *.log
 tsconfig.tsbuildinfo
+.vercel
