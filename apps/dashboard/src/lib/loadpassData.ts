@@ -27,6 +27,7 @@ export interface TimelineEntry {
 export interface LoadDetails {
   id: string;
   offeredBy: string;
+  shipper?: string;
   route: {
     origin: string;
     destination: string;

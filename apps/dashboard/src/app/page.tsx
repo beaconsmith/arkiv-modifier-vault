@@ -507,7 +507,7 @@ function LoadPassContent() {
                     </h2>
 
                     <p className="mt-2 text-base font-bold text-slate-800 dark:text-slate-100">
-                      {activeLoad.shipper} published an explicit revocation receipt on Arkiv.
+                      {activeLoad.shipper || "The shipper"} published an explicit revocation receipt on Arkiv.
                     </p>
 
                     <div className="mt-3 rounded-lg bg-red-50 p-3 text-xs font-semibold text-red-900 dark:bg-red-950 dark:text-red-200 border border-red-200 dark:border-red-900">
