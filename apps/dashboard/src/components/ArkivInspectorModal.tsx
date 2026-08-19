@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Database, Lock, X, Play, RefreshCw, ExternalLink, Ban } from "lucide-react";
-import { ARKIV_DATA, type LoadDetails } from "@/lib/loadpassData";
+import { DEMO_LOADS, type LoadDetails } from "@/lib/loadpassData";
 
 interface ArkivInspectorModalProps {
   load: LoadDetails;
@@ -29,7 +29,7 @@ export function ArkivInspectorModal({
 
   if (!isOpen) return null;
 
-  const data = ARKIV_DATA[load.id as keyof typeof ARKIV_DATA] || ARKIV_DATA["LP-4821"];
+  const data = load.arkivEntities || DEMO_LOADS["LP-4821"].arkivEntities;
 
   // Handle active simulation overrides in JSON payload preview
   const displayMandate = {
