@@ -14,11 +14,7 @@ import {
   Building2,
   Calendar,
   Database,
-  ArrowRight,
   FileSearch,
-  Shield,
-  Layers,
-  Sparkles,
 } from "lucide-react";
 
 import { DEMO_LOADS, type LoadDetails } from "@/lib/loadpassData";

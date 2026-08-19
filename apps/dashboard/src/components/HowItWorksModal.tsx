@@ -1,6 +1,6 @@
 "use client";
 
-import { X, ShieldCheck, CheckCircle2, ArrowRight } from "lucide-react";
+import { X, ShieldCheck } from "lucide-react";
 
 interface HowItWorksModalProps {
   isOpen: boolean;

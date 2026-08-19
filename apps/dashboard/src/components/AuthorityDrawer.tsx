@@ -1,6 +1,6 @@
 "use client";
 
-import { X, Clock, ShieldCheck, ArrowDown, Building2, CheckCircle2, AlertTriangle, HelpCircle } from "lucide-react";
+import { X, Clock, ArrowDown } from "lucide-react";
 import type { LoadDetails } from "@/lib/loadpassData";
 
 interface AuthorityDrawerProps {
