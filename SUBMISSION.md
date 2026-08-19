@@ -8,7 +8,7 @@ Use this file as the copy-paste source for the submission form.
 | Theme | Freight Logistics & Verification |
 | Summary | Verify the live authority chain behind a freight offer before you book it. Powered by Arkiv Braga. |
 | GitHub repo | https://github.com/beaconsmith/arkiv-modifier-vault |
-| Demo link | https://modifiervault.vercel.app |
+| Demo link | https://loadpass-freight.vercel.app |
 | Demo video | https://www.loom.com/share/1f42e1f0253e46bba84221ad10064ab2 |
 | Team | Nzube Ndiokwelu |
 | GitHub handle | `beaconsmith` |
