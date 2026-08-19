@@ -1,8 +1,8 @@
 export const PROJECT_ATTRIBUTE = "modifiervault_beaconsmith_ethns_2026";
 export const SCHEMA_VERSION = "3";
 
-export const APP_NAME = "ModifierVault";
-export const APP_TAGLINE = "Own the way your AI remembers.";
+export const APP_NAME = "LOADPASS";
+export const APP_TAGLINE = "Verify the right to tender";
 
 export const ARKIV_BRAGA_CHAIN_ID = 60138453102;
 export const ARKIV_BRAGA_RPC_URL =

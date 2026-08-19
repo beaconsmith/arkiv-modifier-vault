@@ -1,6 +1,6 @@
-# ModifierVault
+# LOADPASS
 
-ModifierVault is user-owned AI memory infrastructure. It represents memory as a portable semantic graph instead of hidden platform state, so a user can inspect, query, export, encrypt, and reinterpret what an agent remembers.
+LOADPASS is a freight marketplace authority verification system. It answers one critical operational question before a carrier accepts a load offer: *"Does this broker currently have the authority to offer THIS load?"*
 
 The project namespace is:
 
