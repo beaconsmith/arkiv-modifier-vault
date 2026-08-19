@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, ShieldCheck, Sparkles, PlusCircle } from "lucide-react";
+import { X, Sparkles, PlusCircle } from "lucide-react";
 import type { LoadDetails } from "@/lib/loadpassData";
 
 interface IssueMandateModalProps {
@@ -15,7 +15,7 @@ export function IssueMandateModal({
   onClose,
   onIssueMandate,
 }: IssueMandateModalProps) {
-  const [loadId, setLoadId] = useState(`LP-${Math.floor(1000 + Math.random() * 9000)}`);
+  const [loadId, setLoadId] = useState("LP-3310");
   const [shipper, setShipper] = useState("Cargill Food Solutions");
   const [broker, setBroker] = useState("North American Logistics");
   const [origin, setOrigin] = useState("Memphis, TN");

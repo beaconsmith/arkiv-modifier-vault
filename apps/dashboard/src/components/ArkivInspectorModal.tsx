@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Database, Lock, X, Play, RefreshCw, CheckCircle2, ShieldAlert, ExternalLink, Ban } from "lucide-react";
+import { Database, Lock, X, Play, RefreshCw, ExternalLink, Ban } from "lucide-react";
 import { ARKIV_DATA, type LoadDetails } from "@/lib/loadpassData";
 
 interface ArkivInspectorModalProps {

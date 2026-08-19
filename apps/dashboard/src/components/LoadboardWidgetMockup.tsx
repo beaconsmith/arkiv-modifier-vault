@@ -1,6 +1,6 @@
 "use client";
 
-import { ShieldCheck, CheckCircle2, AlertTriangle, ExternalLink, Chrome } from "lucide-react";
+import { ShieldCheck, CheckCircle2, AlertTriangle, ExternalLink, Globe } from "lucide-react";
 
 interface LoadboardWidgetMockupProps {
   onSelectLoad: (id: string) => void;
@@ -12,7 +12,7 @@ export function LoadboardWidgetMockup({ onSelectLoad }: LoadboardWidgetMockupPro
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4 dark:border-slate-800">
         <div className="flex items-center gap-3">
           <div className="grid h-10 w-10 place-items-center rounded-xl bg-sky-600 text-white shadow-md">
-            <Chrome className="h-5 w-5" />
+            <Globe className="h-5 w-5" />
           </div>
           <div>
             <span className="text-xs font-bold uppercase tracking-widest text-sky-600 dark:text-sky-400">

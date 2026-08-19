@@ -17,7 +17,6 @@ import {
   Database,
   FileSearch,
   PlusCircle,
-  Share2,
   Copy,
   Check,
   Ban,
@@ -56,14 +55,6 @@ function LoadPassContent() {
   const [isSimulatedRevoked, setIsSimulatedRevoked] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // Read URL query parameter on initial load
-  useEffect(() => {
-    const loadFromUrl = searchParams.get("load");
-    if (loadFromUrl) {
-      handleVerify(loadFromUrl);
-    }
-  }, [searchParams]);
-
   const handleVerify = async (reference: string) => {
     const cleanRef = reference.trim().toUpperCase();
     if (!cleanRef) return;
@@ -95,6 +86,14 @@ function LoadPassContent() {
       setUnknownRef(cleanRef);
     }
   };
+
+  // Read URL query parameter on initial load
+  useEffect(() => {
+    const loadFromUrl = searchParams.get("load");
+    if (loadFromUrl) {
+      handleVerify(loadFromUrl);
+    }
+  }, [searchParams]);
 
   const handleReset = () => {
     setActiveLoad(null);
