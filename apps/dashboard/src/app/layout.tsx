@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AppShell } from "@/components/AppShell";
-import { SecurityProvider } from "@/context/SecurityContext";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,9 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ModifierVault | User-owned AI memory on Arkiv",
-  description:
-    "A web3-native AI memory atlas for Arkiv Braga testnet and the ETHNS challenge.",
+  title: "LOADPASS | Freight Marketplace Verification",
+  description: "Verify the live authority chain behind a freight offer before you book it.",
 };
 
 export default function RootLayout({
@@ -30,12 +28,9 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full">
-        <SecurityProvider>
-          <AppShell>{children}</AppShell>
-        </SecurityProvider>
+      <body className="min-h-full bg-slate-50 text-slate-900">
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );
 }
-
