@@ -29,7 +29,7 @@ export function ArkivInspectorModal({
 
   if (!isOpen) return null;
 
-  const data = ARKIV_DATA[load.id] || ARKIV_DATA["LP-4821"];
+  const data = ARKIV_DATA[load.id as keyof typeof ARKIV_DATA] || ARKIV_DATA["LP-4821"];
 
   // Handle active simulation overrides in JSON payload preview
   const displayMandate = {
