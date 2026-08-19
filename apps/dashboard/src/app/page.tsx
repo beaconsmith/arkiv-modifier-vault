@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   ShieldCheck,
   Search,
@@ -15,6 +16,11 @@ import {
   Calendar,
   Database,
   FileSearch,
+  PlusCircle,
+  Share2,
+  Copy,
+  Check,
+  Ban,
 } from "lucide-react";
 
 import { DEMO_LOADS, type LoadDetails } from "@/lib/loadpassData";
@@ -26,22 +32,37 @@ import { ArkivExplainer } from "@/components/ArkivExplainer";
 import { ArkivInspectorModal } from "@/components/ArkivInspectorModal";
 import { AuthorityDrawer } from "@/components/AuthorityDrawer";
 import { HowItWorksModal } from "@/components/HowItWorksModal";
+import { IssueMandateModal } from "@/components/IssueMandateModal";
+import { LoadboardWidgetMockup } from "@/components/LoadboardWidgetMockup";
 
-export default function Home() {
+function LoadPassContent() {
+  const searchParams = useSearchParams();
   const [inputRef, setInputRef] = useState("");
   const [activeLoad, setActiveLoad] = useState<LoadDetails | null>(null);
   const [unknownRef, setUnknownRef] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [searchStep, setSearchStep] = useState<string>("");
+  const [customLoads, setCustomLoads] = useState<Record<string, LoadDetails>>({});
 
   // Modals & Drawers
   const [isInspectorOpen, setIsInspectorOpen] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
+  const [isIssueMandateOpen, setIsIssueMandateOpen] = useState(false);
 
-  // Expansions & Simulations
+  // Expansions, Simulations & Share Status
   const [showChecks, setShowChecks] = useState(false);
   const [isSimulatedExpired, setIsSimulatedExpired] = useState(false);
+  const [isSimulatedRevoked, setIsSimulatedRevoked] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  // Read URL query parameter on initial load
+  useEffect(() => {
+    const loadFromUrl = searchParams.get("load");
+    if (loadFromUrl) {
+      handleVerify(loadFromUrl);
+    }
+  }, [searchParams]);
 
   const handleVerify = async (reference: string) => {
     const cleanRef = reference.trim().toUpperCase();
@@ -52,6 +73,7 @@ export default function Home() {
     setUnknownRef(null);
     setShowChecks(false);
     setIsSimulatedExpired(false);
+    setIsSimulatedRevoked(false);
 
     // Realistic Loading Stepper (~1.2s)
     setSearchStep("Finding live mandate…");
@@ -66,8 +88,9 @@ export default function Home() {
     setIsSearching(false);
     setSearchStep("");
 
-    if (DEMO_LOADS[cleanRef]) {
-      setActiveLoad(DEMO_LOADS[cleanRef]);
+    const allLoads = { ...DEMO_LOADS, ...customLoads };
+    if (allLoads[cleanRef]) {
+      setActiveLoad(allLoads[cleanRef]);
     } else {
       setUnknownRef(cleanRef);
     }
@@ -80,17 +103,23 @@ export default function Home() {
     setIsSearching(false);
     setShowChecks(false);
     setIsSimulatedExpired(false);
+    setIsSimulatedRevoked(false);
     setIsInspectorOpen(false);
     setIsDrawerOpen(false);
+    setIsIssueMandateOpen(false);
   };
 
-  // Simulation handler for Mandate Expiry
-  const handleSimulateExpiry = () => {
-    setIsSimulatedExpired(true);
+  const handleIssueMandate = (newLoad: LoadDetails) => {
+    setCustomLoads((prev) => ({ ...prev, [newLoad.id]: newLoad }));
+    setActiveLoad(newLoad);
   };
 
-  const handleResetSimulatedExpiry = () => {
-    setIsSimulatedExpired(false);
+  const handleCopyShareLink = () => {
+    if (!activeLoad) return;
+    const shareUrl = `${window.location.origin}/?load=${activeLoad.id}`;
+    navigator.clipboard.writeText(shareUrl);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
   };
 
   return (
@@ -102,6 +131,7 @@ export default function Home() {
         onReset={handleReset}
         onOpenHowItWorks={() => setIsHowItWorksOpen(true)}
         onOpenArkivInspector={() => setIsInspectorOpen(true)}
+        onOpenIssueMandate={() => setIsIssueMandateOpen(true)}
         currentSearchId={activeLoad?.id || unknownRef || undefined}
         isSearching={isSearching}
       />
@@ -113,9 +143,14 @@ export default function Home() {
             load={activeLoad}
             isOpen={isInspectorOpen}
             onClose={() => setIsInspectorOpen(false)}
-            onSimulateExpiry={handleSimulateExpiry}
-            onResetSimulatedExpiry={handleResetSimulatedExpiry}
+            onSimulateExpiry={() => setIsSimulatedExpired(true)}
+            onSimulateRevocation={() => setIsSimulatedRevoked(true)}
+            onResetSimulations={() => {
+              setIsSimulatedExpired(false);
+              setIsSimulatedRevoked(false);
+            }}
             isSimulatedExpired={isSimulatedExpired}
+            isSimulatedRevoked={isSimulatedRevoked}
           />
 
           <AuthorityDrawer
@@ -132,6 +167,12 @@ export default function Home() {
         onClose={() => setIsHowItWorksOpen(false)}
       />
 
+      <IssueMandateModal
+        isOpen={isIssueMandateOpen}
+        onClose={() => setIsIssueMandateOpen(false)}
+        onIssueMandate={handleIssueMandate}
+      />
+
       {/* Main Container */}
       <main className="mx-auto max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8 space-y-8">
         
@@ -139,7 +180,7 @@ export default function Home() {
         {/* STATE A — SEARCH HERO (No load selected)                                  */}
         {/* ========================================================================= */}
         {!activeLoad && !unknownRef && !isSearching && (
-          <section className="mx-auto max-w-4xl pt-6 pb-12 text-center">
+          <section className="mx-auto max-w-4xl pt-6 pb-8 text-center">
             <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-4 py-1.5 text-xs font-bold text-sky-800 dark:border-sky-900 dark:bg-sky-950/60 dark:text-sky-300 shadow-2xs">
               <ShieldCheck className="h-4 w-4" />
               <span>Live Freight Mandate Verification</span>
@@ -179,13 +220,25 @@ export default function Home() {
                   </div>
                 </div>
 
-                <button
-                  type="submit"
-                  className="w-full h-12 rounded-xl bg-sky-600 text-white font-bold text-sm hover:bg-sky-700 active:scale-[0.99] transition shadow-md flex items-center justify-center gap-2"
-                >
-                  <ShieldCheck className="h-4 w-4" />
-                  <span>Verify load</span>
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    className="flex-1 h-12 rounded-xl bg-sky-600 text-white font-bold text-sm hover:bg-sky-700 active:scale-[0.99] transition shadow-md flex items-center justify-center gap-2"
+                  >
+                    <ShieldCheck className="h-4 w-4" />
+                    <span>Verify load</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsIssueMandateOpen(true)}
+                    className="h-12 px-4 rounded-xl border border-slate-300 bg-slate-50 text-slate-700 font-bold text-xs hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 transition flex items-center gap-1.5"
+                    title="Issue dynamic load mandate"
+                  >
+                    <PlusCircle className="h-4 w-4 text-sky-600" />
+                    <span>Create load</span>
+                  </button>
+                </div>
               </form>
 
               {/* 3 Interactive Demo Shortcuts */}
@@ -277,7 +330,7 @@ export default function Home() {
                 This does not mean the load or broker is invalid. It means no matching shared authority record was found.
               </p>
 
-              <div className="mt-6 flex justify-center gap-3">
+              <div className="mt-6 flex flex-wrap justify-center gap-3">
                 <button
                   onClick={handleReset}
                   className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-bold text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white transition"
@@ -286,10 +339,11 @@ export default function Home() {
                   <span>Check reference</span>
                 </button>
                 <button
-                  onClick={() => handleVerify("LP-4821")}
-                  className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 transition"
+                  onClick={() => setIsIssueMandateOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-sky-300 bg-sky-50 px-5 py-2.5 text-xs font-bold text-sky-800 hover:bg-sky-100 dark:border-sky-900 dark:bg-sky-950 dark:text-sky-300 transition"
                 >
-                  <span>Try a demo load</span>
+                  <PlusCircle className="h-4 w-4" />
+                  <span>Create custom load</span>
                 </button>
               </div>
             </div>
@@ -338,6 +392,15 @@ export default function Home() {
 
                 <div className="flex items-center gap-2">
                   <button
+                    onClick={handleCopyShareLink}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 transition"
+                    title="Copy direct link for hackathon judges"
+                  >
+                    {copiedLink ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                    <span>{copiedLink ? "Link copied!" : "Share link"}</span>
+                  </button>
+
+                  <button
                     onClick={() => setIsInspectorOpen(true)}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-800 hover:bg-sky-100 dark:border-sky-900 dark:bg-sky-950 dark:text-sky-300 transition"
                   >
@@ -363,7 +426,7 @@ export default function Home() {
               <div className="lg:col-span-7 space-y-6">
                 
                 {/* Result Card */}
-                {(activeLoad.status === "VERIFIED" && !isSimulatedExpired) ? (
+                {(activeLoad.status === "VERIFIED" && !isSimulatedExpired && !isSimulatedRevoked) ? (
                   /* VERIFIED RESULT PANEL */
                   <div className="rounded-2xl border-2 border-emerald-500 bg-white p-6 md:p-8 shadow-xl dark:border-emerald-600 dark:bg-slate-900 relative overflow-hidden">
                     <div className="flex items-center justify-between gap-3 border-b border-emerald-100 pb-4 dark:border-slate-800">
@@ -421,6 +484,43 @@ export default function Home() {
                       {showChecks && (
                         <AuthorityChecksView checks={activeLoad.checks} onClose={() => setShowChecks(false)} />
                       )}
+                    </div>
+                  </div>
+                ) : isSimulatedRevoked ? (
+                  /* REVOKED RESULT PANEL */
+                  <div className="rounded-2xl border-2 border-red-500 bg-white p-6 md:p-8 shadow-xl dark:border-red-600 dark:bg-slate-900 relative overflow-hidden">
+                    <div className="flex items-center justify-between gap-3 border-b border-red-100 pb-4 dark:border-slate-800">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-red-600 px-3 py-1 text-xs font-black uppercase tracking-wider text-white shadow-xs">
+                        REVOKED BY SHIPPER
+                      </span>
+                      <span className="text-xs font-bold text-red-700 dark:text-red-400 flex items-center gap-1">
+                        <Ban className="h-3.5 w-3.5" />
+                        Revocation receipt published
+                      </span>
+                    </div>
+
+                    <h2 className="mt-4 text-3xl sm:text-4xl font-black tracking-tight text-red-700 dark:text-red-400 flex items-center gap-3">
+                      <Ban className="h-9 w-9 shrink-0 text-red-600" />
+                      <span>○ MANDATE REVOKED</span>
+                    </h2>
+
+                    <p className="mt-2 text-base font-bold text-slate-800 dark:text-slate-100">
+                      {activeLoad.shipper} published an explicit revocation receipt on Arkiv.
+                    </p>
+
+                    <div className="mt-3 rounded-lg bg-red-50 p-3 text-xs font-semibold text-red-900 dark:bg-red-950 dark:text-red-200 border border-red-200 dark:border-red-900">
+                      <strong>Revocation rule output:</strong> All downstream broker delegation standing is terminated immediately across the freight network.
+                    </div>
+
+                    {/* Actions */}
+                    <div className="mt-6 flex flex-wrap gap-3">
+                      <button
+                        onClick={() => setIsInspectorOpen(true)}
+                        className="h-11 px-5 rounded-xl bg-red-600 text-white font-bold text-xs hover:bg-red-700 transition shadow-md flex items-center justify-center gap-2"
+                      >
+                        <Database className="h-4 w-4" />
+                        <span>Inspect revocation receipt</span>
+                      </button>
                     </div>
                   </div>
                 ) : (activeLoad.status === "EXPIRED" || isSimulatedExpired) ? (
@@ -577,8 +677,9 @@ export default function Home() {
         )}
 
         {/* ========================================================================= */}
-        {/* EDUCATIONAL COMPARISON & ARKIV ARCHITECTURAL EXPLAINER (Always accessible)  */}
+        {/* CARRIER BROWSER EXTENSION MOCKUP & EDUCATIONAL SECTIONS                    */}
         {/* ========================================================================= */}
+        <LoadboardWidgetMockup onSelectLoad={handleVerify} />
         <EducationalComparison />
         <ArkivExplainer />
 
@@ -606,5 +707,17 @@ export default function Home() {
         </div>
       </footer>
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen grid place-items-center bg-slate-50 dark:bg-slate-950">
+        <RefreshCw className="h-8 w-8 animate-spin text-sky-600" />
+      </div>
+    }>
+      <LoadPassContent />
+    </Suspense>
   );
 }

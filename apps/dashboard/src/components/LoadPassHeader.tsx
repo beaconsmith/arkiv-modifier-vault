@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { ShieldCheck, Search, RefreshCw, ChevronDown, CheckCircle2, AlertTriangle, Clock, HelpCircle, Database } from "lucide-react";
+import { ShieldCheck, Search, RefreshCw, ChevronDown, CheckCircle2, AlertTriangle, Clock, HelpCircle, Database, PlusCircle } from "lucide-react";
 
 interface LoadPassHeaderProps {
   onSearch: (reference: string) => void;
   onReset: () => void;
   onOpenHowItWorks: () => void;
   onOpenArkivInspector: () => void;
+  onOpenIssueMandate: () => void;
   currentSearchId?: string;
   isSearching: boolean;
 }
@@ -17,6 +18,7 @@ export function LoadPassHeader({
   onReset,
   onOpenHowItWorks,
   onOpenArkivInspector,
+  onOpenIssueMandate,
   currentSearchId,
   isSearching,
 }: LoadPassHeaderProps) {
@@ -82,6 +84,15 @@ export function LoadPassHeader({
         {/* Top-right Controls & Search */}
         <div className="flex items-center gap-3">
           
+          {/* Issue Mandate Action Button */}
+          <button
+            onClick={onOpenIssueMandate}
+            className="hidden md:inline-flex h-9 items-center gap-1.5 rounded-lg bg-sky-600 px-3 text-xs font-bold text-white hover:bg-sky-700 transition shadow-2xs"
+          >
+            <PlusCircle className="h-3.5 w-3.5" />
+            <span>Issue mandate</span>
+          </button>
+
           {/* Compressed Search Input (when result is active) */}
           <form onSubmit={handleHeaderSubmit} className="hidden sm:flex items-center relative">
             <input
