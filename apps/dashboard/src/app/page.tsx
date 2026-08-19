@@ -91,7 +91,10 @@ function LoadPassContent() {
   useEffect(() => {
     const loadFromUrl = searchParams.get("load");
     if (loadFromUrl) {
-      handleVerify(loadFromUrl);
+      const timer = setTimeout(() => {
+        handleVerify(loadFromUrl);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [searchParams]);
 
