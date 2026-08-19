@@ -36,7 +36,7 @@ export function ArkivInspectorModal({
     ...data.mandate,
     txHash: "0x8f6516a059ca714788b37cb2195a81d2097e07f5630aa3b75f27ad960c5219d1",
     payload: {
-      ...data.mandate.payload,
+      ...data.mandate,
       status: isSimulatedRevoked
         ? "REVOKED"
         : isSimulatedExpired
