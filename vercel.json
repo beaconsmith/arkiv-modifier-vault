@@ -1,4 +1,4 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": "apps/dashboard/.next"
+  "buildCommand": "npm run build && node -e \"require('fs').cpSync('apps/dashboard/.next', '.next', {recursive: true})\"",
+  "framework": "nextjs"
 }
