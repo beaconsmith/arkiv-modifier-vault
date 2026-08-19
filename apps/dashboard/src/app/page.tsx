@@ -89,7 +89,7 @@ function LoadPassContent() {
 
   // Read URL query parameter on initial load
   useEffect(() => {
-    const loadFromUrl = searchParams.get("load");
+    const loadFromUrl = searchParams?.get("load");
     if (loadFromUrl) {
       const timer = setTimeout(() => {
         handleVerify(loadFromUrl);
